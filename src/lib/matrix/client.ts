@@ -253,7 +253,7 @@ export async function sendFormattedMessage(
 	} as never);
 }
 
-export function mxcToHttp(mxcUrl: string | null | undefined, size = 40): string | null {
+export function mxcToHttp(mxcUrl: string | null | undefined, size = 0): string | null {
 	if (!matrixClient || !mxcUrl?.startsWith('mxc://')) return null;
 	const match = mxcUrl.match(/^mxc:\/\/([^/]+)\/(.+)$/);
 	if (!match) return null;
@@ -300,9 +300,9 @@ export async function getUrlPreview(url: string): Promise<UrlPreview | null> {
 	try {
 		const data = await matrixClient.getUrlPreview(url, Date.now());
 		const ogImage = data['og:image'] as string | undefined;
-		const imageUrl = ogImage?.startsWith('mxc://') ? mxcToHttp(ogImage, 800) ?? undefined : ogImage;
+		const imageUrl = ogImage?.startsWith('mxc://') ? mxcToHttp(ogImage) ?? undefined : ogImage;
 		const rawVideo = (data['og:video:secure_url'] ?? data['og:video:url'] ?? data['og:video']) as string | undefined;
-		const videoUrl = rawVideo?.startsWith('mxc://') ? mxcToHttp(rawVideo, 0) ?? undefined : rawVideo;
+		const videoUrl = rawVideo?.startsWith('mxc://') ? mxcToHttp(rawVideo) ?? undefined : rawVideo;
 		return {
 			title: data['og:title'] as string | undefined,
 			description: data['og:description'] as string | undefined,
@@ -322,11 +322,11 @@ export function getOwnUserId(): string | null {
 	return matrixClient?.getUserId() ?? null;
 }
 
-export function getOwnAvatarUrl(size = 40): string | null {
+export function getOwnAvatarUrl(): string | null {
 	const userId = matrixClient?.getUserId();
 	if (!userId) return null;
 	const mxc = matrixClient?.getUser(userId)?.avatarUrl;
-	return mxcToHttp(mxc, size);
+	return mxcToHttp(mxc);
 }
 
 export function getRoomDisplayName(room: Room): string {
@@ -337,9 +337,9 @@ export function getMemberName(room: Room, userId: string): string {
 	return room.getMember(userId)?.name || userId;
 }
 
-export function getMemberAvatar(room: Room, userId: string, size = 40): string | null {
+export function getMemberAvatar(room: Room, userId: string): string | null {
 	const mxc = room.getMember(userId)?.getMxcAvatarUrl();
-	return mxcToHttp(mxc, size);
+	return mxcToHttp(mxc);
 }
 
 export function getRoomMembers(room: Room): RoomMember[] {
@@ -351,10 +351,10 @@ export function getRoomTopic(room: Room): string | null {
 	return topicEvent?.getContent()?.topic || null;
 }
 
-export function getRoomAvatar(room: Room, size = 40): string | null {
+export function getRoomAvatar(room: Room): string | null {
 	const avatarEvent = room.currentState.getStateEvents('m.room.avatar', '');
 	const mxc = avatarEvent?.getContent()?.url;
-	return mxcToHttp(mxc, size);
+	return mxcToHttp(mxc);
 }
 
 export function getUnreadCount(room: Room): number {
@@ -480,7 +480,7 @@ export async function fetchSpaceHierarchy(spaceId: string): Promise<SpaceChildIn
 					roomId: r['room_id'] as string,
 					name: (r['name'] as string) || (r['room_id'] as string),
 					topic: r['topic'] as string | undefined,
-					avatarUrl: mxcAvatar ? mxcToHttp(mxcAvatar, 40) ?? undefined : undefined,
+					avatarUrl: mxcAvatar ? mxcToHttp(mxcAvatar) ?? undefined : undefined,
 					numMembers: (r['num_joined_members'] as number) ?? 0,
 					isJoined: joinedIds.has(r['room_id'] as string)
 				};
@@ -608,7 +608,7 @@ function extractRoomImages(room: Room, kind: ImageUsage): CustomEmoji[] {
 					data?.url?.startsWith('mxc://') && !seen.has(shortcode) && matchesUsage(data.usage, packUsage, kind))
 				.flatMap(([shortcode, data]) => {
 					seen.add(shortcode);
-					const http = mxcToHttp(data.url!, 48);
+					const http = mxcToHttp(data.url!);
 					return http ? [{ shortcode, mxcUrl: data.url!, url: http }] : [];
 				});
 		});
@@ -632,7 +632,7 @@ function getUserPackImages(kind: ImageUsage): CustomEmoji[] {
 		return Object.entries(images)
 			.filter(([, data]) => data?.url?.startsWith('mxc://') && matchesUsage(data.usage, packUsage, kind))
 			.flatMap(([shortcode, data]) => {
-				const http = mxcToHttp(data.url!, 48);
+				const http = mxcToHttp(data.url!);
 				return http ? [{ shortcode, mxcUrl: data.url!, url: http }] : [];
 			});
 	} catch { return []; }

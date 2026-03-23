@@ -96,7 +96,7 @@
 	// Sticker URL
 	const stickerHttpUrl = $derived(() => {
 		if (eventType !== 'm.sticker') return null;
-		return mxcToHttp(content?.url as string, 256);
+		return mxcToHttp(content?.url as string);
 	});
 
 	// Image conversion
@@ -107,9 +107,9 @@
 		const h = info?.h ?? 600;
 		const thumbnailMxc = info?.thumbnail_url as string | undefined;
 		if (thumbnailMxc && (w > 800 || h > 600)) {
-			return mxcToHttp(thumbnailMxc, 800) ?? mxcToHttp(content?.url as string, 800);
+			return mxcToHttp(thumbnailMxc) ?? mxcToHttp(content?.url as string);
 		}
-		return mxcToHttp(content?.url as string, 800);
+		return mxcToHttp(content?.url as string);
 	});
 
 	// Whether this uploaded image is a GIF (eligible for favouriting)
@@ -246,7 +246,7 @@
 			.replace(/\son\w+="[^"]*"/g, '')
 			// Convert mxc:// src attributes to HTTP URLs so browsers can load them
 			.replace(/src="(mxc:\/\/[^"]+)"/g, (_match, mxc) => {
-				const http = mediaStore.resolve(mxcToHttp(mxc, 128));
+				const http = mediaStore.resolve(mxcToHttp(mxc));
 				return http ? `src="${http}"` : `src=""`;
 			});
 	}

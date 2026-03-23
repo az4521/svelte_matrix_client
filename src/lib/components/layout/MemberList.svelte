@@ -25,7 +25,7 @@
 
 	function getAvatarSrc(member: RoomMember): string | null {
 		const mxc = member.getMxcAvatarUrl();
-		return mxcToHttp(mxc, 32);
+		return mxcToHttp(mxc);
 	}
 </script>
 
