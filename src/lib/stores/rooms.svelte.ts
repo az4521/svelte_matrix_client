@@ -2,6 +2,7 @@ import type { Room } from 'matrix-js-sdk';
 import type { SpaceChildInfo } from '$lib/matrix/client';
 
 const STORAGE_KEY = 'matrix_last_room_by_space';
+const SPACE_KEY = 'matrix_last_space';
 const HOME_KEY = '__home__';
 
 function loadLastRooms(): Record<string, string> {
@@ -22,12 +23,24 @@ function getLastRoom(spaceId: string | null): string | null {
 	return loadLastRooms()[spaceId ?? HOME_KEY] ?? null;
 }
 
+function loadLastSpace(): string | null {
+	return localStorage.getItem(SPACE_KEY);
+}
+
+function saveLastSpace(spaceId: string | null): void {
+	if (spaceId === null) {
+		localStorage.removeItem(SPACE_KEY);
+	} else {
+		localStorage.setItem(SPACE_KEY, spaceId);
+	}
+}
+
 export const roomsState = $state({
 	spaces: [] as Room[],
 	orphanRooms: [] as Room[],
 	directRooms: [] as Room[],
-	activeSpaceId: null as string | null,
-	activeRoomId: null as string | null,
+	activeSpaceId: loadLastSpace() as string | null,
+	activeRoomId: getLastRoom(loadLastSpace()) as string | null,
 	roomsInSpace: [] as Room[],
 	spaceHierarchy: [] as SpaceChildInfo[],
 	hierarchyLoading: false,
@@ -44,6 +57,7 @@ export function setActiveSpace(spaceId: string | null): void {
 	roomsState.activeSpaceId = spaceId;
 	roomsState.activeRoomId = getLastRoom(spaceId);
 	roomsState.spaceHierarchy = [];
+	saveLastSpace(spaceId);
 }
 
 export function setActiveRoom(roomId: string): void {

@@ -423,12 +423,18 @@ export function onEditEvent(callback: (event: MatrixEvent, room: Room) => void):
 	return () => matrixClient?.off(RoomEvent.Timeline, handler as never);
 }
 
-export async function sendEdit(roomId: string, eventId: string, newText: string): Promise<void> {
+export async function sendEdit(roomId: string, eventId: string, newText: string, formattedBody?: string): Promise<void> {
 	if (!matrixClient) throw new Error('Not logged in');
+	const newContent: Record<string, unknown> = { msgtype: 'm.text', body: newText };
+	if (formattedBody) {
+		newContent.format = 'org.matrix.custom.html';
+		newContent.formatted_body = formattedBody;
+	}
 	await matrixClient.sendEvent(roomId, 'm.room.message' as never, {
 		msgtype: 'm.text',
 		body: `* ${newText}`,
-		'm.new_content': { msgtype: 'm.text', body: newText },
+		...(formattedBody ? { format: 'org.matrix.custom.html', formatted_body: `* ${formattedBody}` } : {}),
+		'm.new_content': newContent,
 		'm.relates_to': { rel_type: 'm.replace', event_id: eventId }
 	} as never);
 }
@@ -765,7 +771,8 @@ export function findEventById(room: Room, eventId: string): MatrixEvent | null {
 export async function sendReply(
 	roomId: string,
 	text: string,
-	replyToEvent: MatrixEvent
+	replyToEvent: MatrixEvent,
+	formattedText?: string
 ): Promise<void> {
 	if (!matrixClient) throw new Error('Not logged in');
 
@@ -793,7 +800,7 @@ export async function sendReply(
 		msgtype: 'm.text',
 		body: fallbackBody,
 		format: 'org.matrix.custom.html',
-		formatted_body: formattedQuote + text,
+		formatted_body: formattedQuote + (formattedText ?? text),
 		'm.relates_to': {
 			'm.in_reply_to': { event_id: replyEventId }
 		}

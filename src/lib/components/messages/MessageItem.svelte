@@ -6,6 +6,7 @@
 	import LinkPreview from '$lib/components/messages/LinkPreview.svelte';
 	import Lightbox from '$lib/components/ui/Lightbox.svelte';
 	import { getMemberName, getMemberAvatar, mxcToHttp, findEventById, sendReaction, sendEdit, deleteMessage } from '$lib/matrix/client';
+	import { parseMarkdown } from '$lib/utils/markdown';
 	import { mediaStore } from '$lib/stores/media.svelte';
 	import { messagesState, bumpReactionTick } from '$lib/stores/messages.svelte';
 	import { auth } from '$lib/stores/auth.svelte';
@@ -27,6 +28,37 @@
 
 	let showEmojiPicker = $state(false);
 	let confirmingDelete = $state(false);
+	let deleteConfirmFocus = $state<'yes' | 'no'>('yes');
+	let deleteYesEl = $state<HTMLButtonElement | undefined>();
+	let deleteNoEl = $state<HTMLButtonElement | undefined>();
+	let deleteRefocus = false;
+
+	$effect(() => {
+		if (confirmingDelete) {
+			deleteConfirmFocus = 'yes';
+			setTimeout(() => deleteYesEl?.focus(), 0);
+		}
+	});
+
+	function resolveDelete(confirmed: boolean) {
+		confirmingDelete = false;
+		if (confirmed) deleteMessage(room.roomId, eventId);
+		if (deleteRefocus) { deleteRefocus = false; onEditDone?.(); }
+	}
+
+	function onDeleteKeydown(e: KeyboardEvent) {
+		if (!confirmingDelete) return;
+		if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+			e.preventDefault();
+			deleteConfirmFocus = deleteConfirmFocus === 'yes' ? 'no' : 'yes';
+			(deleteConfirmFocus === 'yes' ? deleteYesEl : deleteNoEl)?.focus();
+		} else if (e.key === 'Enter') {
+			e.preventDefault();
+			resolveDelete(deleteConfirmFocus === 'yes');
+		} else if (e.key === 'Escape') {
+			resolveDelete(false);
+		}
+	}
 	let imageLightboxOpen = $state(false);
 	let emojiPickerBelow = $state(false);
 	let reactionBtnEl: HTMLButtonElement | undefined = $state();
@@ -195,10 +227,21 @@
 	async function saveEdit() {
 		const trimmed = editText.trim();
 		const realEventId = event.getId() ?? '';
-		if (!trimmed || !realEventId || isSavingEdit) return;
+		if (!realEventId || isSavingEdit) return;
+
+		if (!trimmed) {
+			// Empty edit — cancel without returning focus, then prompt to delete
+			isEditing = false;
+			editText = '';
+			deleteRefocus = editFromKeyboard;
+			editFromKeyboard = false;
+			confirmingDelete = true;
+			return;
+		}
 		isSavingEdit = true;
 		try {
-			await sendEdit(room.roomId, realEventId, trimmed);
+			const { formattedBody, hasFormatting } = parseMarkdown(trimmed);
+			await sendEdit(room.roomId, realEventId, trimmed, hasFormatting ? formattedBody : undefined);
 			isEditing = false;
 			editText = '';
 			bumpReactionTick();
@@ -262,7 +305,7 @@
 	bind:this={rootEl}
 	class="group relative flex gap-3 px-4 py-0.5 hover:bg-discord-messageHover rounded transition-colors"
 	class:pt-3={showHeader}
-	onmouseleave={() => confirmingDelete = false}
+	onmouseleave={() => { if (!confirmingDelete) return; }}
 >
 	<!-- Avatar column -->
 	<div class="w-10 flex-shrink-0 mt-0.5">
@@ -431,7 +474,7 @@
 	</div>
 
 	<!-- Hover action bar: always visible when emoji picker is open, otherwise on group-hover -->
-	<div class="{showEmojiPicker ? 'flex' : 'hidden group-hover:flex'} absolute right-4 top-0 -translate-y-1/2 items-center gap-1 bg-discord-backgroundSecondary border border-discord-divider rounded-lg px-1 py-0.5 shadow-md z-50">
+	<div class="{showEmojiPicker || confirmingDelete ? 'flex' : 'hidden group-hover:flex'} absolute right-4 top-0 -translate-y-1/2 items-center gap-1 bg-discord-backgroundSecondary border border-discord-divider rounded-lg px-1 py-0.5 shadow-md z-50">
 		{#if isOwnMessage && eventType === 'm.room.message' && msgtype === 'm.text'}
 			<button
 				onclick={startEdit}
@@ -447,12 +490,16 @@
 			{#if confirmingDelete}
 				<span class="text-xs text-discord-textMuted px-1">Delete?</span>
 				<button
-					onclick={() => { confirmingDelete = false; deleteMessage(room.roomId, eventId); }}
-					class="px-2 py-1 rounded text-xs font-semibold text-white bg-red-600 hover:bg-red-500 transition-colors"
+					bind:this={deleteYesEl}
+					onclick={() => resolveDelete(true)}
+					onkeydown={onDeleteKeydown}
+					class="px-2 py-1 rounded text-xs font-semibold text-white bg-red-600 hover:bg-red-500 transition-colors focus:outline-none focus:ring-2 focus:ring-red-400"
 				>Yes</button>
 				<button
-					onclick={() => confirmingDelete = false}
-					class="px-2 py-1 rounded text-xs font-semibold text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors"
+					bind:this={deleteNoEl}
+					onclick={() => resolveDelete(false)}
+					onkeydown={onDeleteKeydown}
+					class="px-2 py-1 rounded text-xs font-semibold text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors focus:outline-none focus:ring-2 focus:ring-discord-accent"
 				>No</button>
 			{:else}
 				<button

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { MatrixEvent, Room } from 'matrix-js-sdk';
 	import { sendTextMessage, sendFormattedMessage, sendReply, sendSticker, sendFile, getMemberName, getCustomEmojis, sendTyping, onTypingEvent, type CustomEmoji, type CustomSticker } from '$lib/matrix/client';
+	import { parseMarkdown } from '$lib/utils/markdown';
 	import EmojiPicker from '$lib/components/ui/EmojiPicker.svelte';
 	import StickerPicker from '$lib/components/ui/StickerPicker.svelte';
 	import GifPicker from '$lib/components/ui/GifPicker.svelte';
@@ -89,24 +90,26 @@
 	});
 
 	function buildFormattedBody(plain: string): string | null {
-		// Look up all :shortcode: patterns in the text against available custom emojis
+		// Apply markdown formatting
+		const { formattedBody, hasFormatting } = parseMarkdown(plain);
+		let html = formattedBody;
+		let changed = hasFormatting;
+
+		// Apply custom emoji shortcode substitution
 		const shortcodes = [...plain.matchAll(/:(\w+):/g)].map((m) => m[1]);
-		if (shortcodes.length === 0) return null;
-
-		const available = getCustomEmojis(room, roomsState.activeSpaceId);
-		const lookup = new Map(available.map((e) => [e.shortcode, e.mxcUrl]));
-
-		let html = plain;
-		let changed = false;
-		for (const shortcode of shortcodes) {
-			const mxcUrl = lookup.get(shortcode);
-			console.log(mxcUrl)
-			if (mxcUrl) {
-				const tag = `<img data-mx-emoticon src="${mxcUrl}" alt=":${shortcode}:" title=":${shortcode}:" height="32" />`;
-				html = html.replaceAll(`:${shortcode}:`, tag);
-				changed = true;
+		if (shortcodes.length > 0) {
+			const available = getCustomEmojis(room, roomsState.activeSpaceId);
+			const lookup = new Map(available.map((e) => [e.shortcode, e.mxcUrl]));
+			for (const shortcode of shortcodes) {
+				const mxcUrl = lookup.get(shortcode);
+				if (mxcUrl) {
+					const tag = `<img data-mx-emoticon src="${mxcUrl}" alt=":${shortcode}:" title=":${shortcode}:" height="32" />`;
+					html = html.replaceAll(`:${shortcode}:`, tag);
+					changed = true;
+				}
 			}
 		}
+
 		return changed ? html : null;
 	}
 
@@ -122,7 +125,8 @@
 		try {
 			if (trimmed) {
 				if (replyToEvent) {
-					await sendReply(roomId, trimmed, replyToEvent);
+					const formattedBody = buildFormattedBody(trimmed);
+					await sendReply(roomId, trimmed, replyToEvent, formattedBody ?? undefined);
 					onCancelReply?.();
 				} else {
 					const formattedBody = buildFormattedBody(trimmed);
