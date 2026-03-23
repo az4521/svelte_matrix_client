@@ -72,13 +72,30 @@
 		return null;
 	}
 
-	function getInstagramFixUrl(rawUrl: string): string | null {
+	const IG_PROXY = 'https://matrix.crafty.moe/igproxy';
+
+	function getInstagramProxyUrl(rawUrl: string): string | null {
 		try {
 			const u = new URL(rawUrl);
 			const h = u.hostname.replace(/^www\./, '');
-			if (h === 'instagram.com' || h === 'kkinstagram.com') { u.hostname = 'vxinstagram.com'; return u.toString(); }
+			if (h !== 'instagram.com' && h !== 'kkinstagram.com') return null;
+			// Proxy rewrites to vxinstagram, so just swap the path onto the proxy base
+			return `${IG_PROXY}${u.pathname}${u.search}`;
 		} catch { /* */ }
 		return null;
+	}
+
+	async function fetchOgTags(fetchUrl: string): Promise<Record<string, string>> {
+		const res = await fetch(fetchUrl);
+		const html = await res.text();
+		const tags: Record<string, string> = {};
+		for (const match of html.matchAll(/<meta[^>]+>/gi)) {
+			const tag = match[0];
+			const prop = tag.match(/property="og:([^"]+)"/i)?.[1];
+			const content = tag.match(/content="([^"]*)"/i)?.[1];
+			if (prop && content !== undefined) tags[prop] = content;
+		}
+		return tags;
 	}
 
 	$effect(() => {
@@ -113,11 +130,37 @@
 			return;
 		}
 
-		// Instagram: no CORS-friendly API — use homeserver preview via vxinstagram
-		const igFixUrl = getInstagramFixUrl(currentUrl);
-		if (igFixUrl) {
-			getUrlPreview(igFixUrl).then(data => {
-				if (data && (data.title || data.imageUrl)) preview = data;
+		// Instagram: fetch OG tags via CORS proxy at matrix.crafty.moe/igproxy
+		const igProxyUrl = getInstagramProxyUrl(currentUrl);
+		if (igProxyUrl) {
+			fetchOgTags(igProxyUrl).then(tags => {
+				let videoUrl = tags['video:secure_url'] || tags['video:url'] || tags['video'];
+				if (videoUrl) {
+					// vxinstagram wraps the real URL in a VerifySnapsaveLink redirect —
+					// extract the actual URL from the rapidsaveUrl query parameter
+					try {
+						const decoded = videoUrl.replace(/&amp;/g, '&');
+						const u = new URL(decoded);
+						const rapidsaveUrl = u.searchParams.get('rapidsaveUrl');
+						if (rapidsaveUrl) videoUrl = rapidsaveUrl;
+					} catch { /* use as-is */ }
+					directEmbed = { type: 'video', videoUrl };
+				} else {
+					const imageUrl = tags['image:secure_url'] || tags['image:url'] || tags['image'];
+					const title = tags['title'];
+					const description = tags['description'];
+					const siteName = tags['site_name'];
+					if (imageUrl || title) {
+						preview = { imageUrl, title, description, siteName, canonicalUrl: currentUrl };
+					}
+				}
+			}).catch(() => {
+				// Proxy failed — fall back to homeserver preview
+				const u = new URL(currentUrl);
+				u.hostname = 'vxinstagram.com';
+				getUrlPreview(u.toString()).then(data => {
+					if (data && (data.title || data.imageUrl)) preview = data;
+				});
 			});
 			return;
 		}
