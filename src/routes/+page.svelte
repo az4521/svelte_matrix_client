@@ -4,7 +4,7 @@
 	import { login, reconnect, startSync } from '$lib/matrix/client';
 	import { auth, saveSession, loadStoredSession } from '$lib/stores/auth.svelte';
 
-	let homeserverUrl = $state('https://matrix.org');
+	let homeserverUrl = $state('https://matrix.crafty.moe');
 	let username = $state('');
 	let password = $state('');
 	let isLoading = $state(false);
@@ -125,7 +125,7 @@
 						id="server"
 						type="text"
 						bind:value={homeserverUrl}
-						placeholder="https://matrix.org"
+						placeholder="https://matrix.crafty.moe"
 						disabled={isLoading}
 						class="w-full px-3 py-2.5 bg-discord-backgroundSecondary text-discord-textPrimary placeholder-discord-textMuted rounded border border-discord-divider focus:border-discord-accent focus:outline-none transition-colors disabled:opacity-60 text-sm"
 						required
@@ -141,7 +141,7 @@
 						id="username"
 						type="text"
 						bind:value={username}
-						placeholder="@you:matrix.org"
+						placeholder="@you:matrix.crafty.moe"
 						disabled={isLoading}
 						class="w-full px-3 py-2.5 bg-discord-backgroundSecondary text-discord-textPrimary placeholder-discord-textMuted rounded border border-discord-divider focus:border-discord-accent focus:outline-none transition-colors disabled:opacity-60 text-sm"
 						required

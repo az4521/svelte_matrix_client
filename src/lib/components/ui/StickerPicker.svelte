@@ -2,6 +2,7 @@
 	import { tick } from 'svelte';
 	import { getCustomStickerPacks, getOwnAvatarUrl, type CustomSticker } from '$lib/matrix/client';
 	import { roomsState } from '$lib/stores/rooms.svelte';
+	import { mediaStore } from '$lib/stores/media.svelte';
 
 	interface Props {
 		onSelect: (sticker: CustomSticker) => void;
@@ -206,13 +207,13 @@
 						class:opacity-40={activeTab !== pack.id}
 					>
 						{#if pack.id === 'user' && ownAvatarUrl}
-							<img src={ownAvatarUrl} alt="My stickers" class="w-5 h-5 rounded-full object-cover" />
+							<img src={mediaStore.resolve(ownAvatarUrl)} alt="My stickers" class="w-5 h-5 rounded-full object-cover" />
 						{:else if pack.id === 'user'}
 							<svg class="w-5 h-5 text-discord-textPrimary" fill="currentColor" viewBox="0 0 24 24">
 								<path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
 							</svg>
 						{:else if pack.avatarUrl}
-							<img src={pack.avatarUrl} alt={pack.name} class="w-5 h-5 rounded-full object-cover" />
+							<img src={mediaStore.resolve(pack.avatarUrl)} alt={pack.name} class="w-5 h-5 rounded-full object-cover" />
 						{:else}
 							<span class="w-5 h-5 rounded-full bg-discord-accent flex items-center justify-center text-white text-xs font-bold">
 								{pack.name[0]?.toUpperCase() ?? '?'}
@@ -240,7 +241,7 @@
 								class:ring-2={selectedIndex === globalIdx}
 								class:ring-discord-accent={selectedIndex === globalIdx}
 							>
-								<img src={s.url} alt={s.shortcode} class="w-14 h-14 object-contain" loading="lazy" />
+								<img src={mediaStore.resolve(s.url)} alt={s.shortcode} class="w-14 h-14 object-contain" loading="lazy" />
 							</button>
 						{/each}
 					</div>
@@ -264,7 +265,7 @@
 										class:ring-2={selectedIndex === globalIdx}
 										class:ring-discord-accent={selectedIndex === globalIdx}
 									>
-										<img src={s.url} alt={s.shortcode} class="w-14 h-14 object-contain" loading="lazy" />
+										<img src={mediaStore.resolve(s.url)} alt={s.shortcode} class="w-14 h-14 object-contain" loading="lazy" />
 									</button>
 								{/each}
 							</div>

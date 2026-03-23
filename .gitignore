@@ -5,6 +5,7 @@ node_modules/
 dist/
 dist-ssr/
 *.local
+build/
 
 # SvelteKit (Include this if you upgrade/switch to SvelteKit)
 .svelte-kit/

@@ -6,6 +6,7 @@
 	import LinkPreview from '$lib/components/messages/LinkPreview.svelte';
 	import Lightbox from '$lib/components/ui/Lightbox.svelte';
 	import { getMemberName, getMemberAvatar, mxcToHttp, findEventById, sendReaction, sendEdit, deleteMessage } from '$lib/matrix/client';
+	import { mediaStore } from '$lib/stores/media.svelte';
 	import { messagesState, bumpReactionTick } from '$lib/stores/messages.svelte';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { tick } from 'svelte';
@@ -305,7 +306,7 @@
 
 		<!-- Message body -->
 		{#if eventType === 'm.sticker'}
-			{@const src = stickerHttpUrl()}
+			{@const src = mediaStore.resolve(stickerHttpUrl())}
 			{#if src}
 				<img
 					{src}
@@ -315,7 +316,7 @@
 				/>
 			{/if}
 		{:else if msgtype === 'm.image'}
-			{@const src = imageHttpUrl()}
+			{@const src = mediaStore.resolve(imageHttpUrl())}
 			{#if src}
 				<div class="relative inline-block group/img mt-1">
 					<a href={src} target="_blank" rel="noopener noreferrer" onclick={(e) => { e.preventDefault(); imageLightboxOpen = true; }}>

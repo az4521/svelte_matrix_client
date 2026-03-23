@@ -1,4 +1,4 @@
-import { createClient, ClientEvent, RoomEvent, PendingEventOrdering, EventStatus } from 'matrix-js-sdk';
+import { createClient, ClientEvent, RoomEvent, RoomMemberEvent, PendingEventOrdering, EventStatus } from 'matrix-js-sdk';
 import type { MatrixClient, Room, MatrixEvent, RoomMember } from 'matrix-js-sdk';
 
 let matrixClient: MatrixClient | null = null;
@@ -7,12 +7,29 @@ export function getClient(): MatrixClient | null {
 	return matrixClient;
 }
 
+async function resolveHomeserver(input: string): Promise<string> {
+	const normalized = input.trim().replace(/\/$/, '');
+	const withProtocol = normalized.startsWith('http') ? normalized : `https://${normalized}`;
+	try {
+		const res = await fetch(`${withProtocol}/.well-known/matrix/client`);
+		if (res.ok) {
+			const data = await res.json();
+			const baseUrl: string | undefined = data?.['m.homeserver']?.['base_url'];
+			if (baseUrl) return baseUrl.replace(/\/$/, '');
+		}
+	} catch {
+		// .well-known not available, use input as-is
+	}
+	return withProtocol;
+}
+
 export async function login(
 	homeserverUrl: string,
 	username: string,
 	password: string
 ): Promise<{ userId: string; accessToken: string; deviceId: string; homeserverUrl: string }> {
-	const tempClient = createClient({ baseUrl: homeserverUrl });
+	const resolvedBase = await resolveHomeserver(homeserverUrl);
+	const tempClient = createClient({ baseUrl: resolvedBase });
 
 	const response = await tempClient.login('m.login.password', {
 		user: username,
@@ -20,10 +37,12 @@ export async function login(
 		initial_device_display_name: 'Matrix Svelte Client'
 	});
 
+	const resolvedURL = tempClient.getHomeserverUrl();
+
 	tempClient.stopClient();
 
 	matrixClient = createClient({
-		baseUrl: homeserverUrl,
+		baseUrl: resolvedURL,
 		accessToken: response.access_token,
 		userId: response.user_id,
 		deviceId: response.device_id,
@@ -33,7 +52,7 @@ export async function login(
 		userId: response.user_id,
 		accessToken: response.access_token!,
 		deviceId: response.device_id!,
-		homeserverUrl
+		homeserverUrl: resolvedURL
 	};
 }
 
@@ -236,7 +255,33 @@ export async function sendFormattedMessage(
 
 export function mxcToHttp(mxcUrl: string | null | undefined, size = 40): string | null {
 	if (!matrixClient || !mxcUrl?.startsWith('mxc://')) return null;
-	return matrixClient.mxcUrlToHttp(mxcUrl, size, size, 'crop') || null;
+	const match = mxcUrl.match(/^mxc:\/\/([^/]+)\/(.+)$/);
+	if (!match) return null;
+	const [, serverName, mediaId] = match;
+	const baseUrl = matrixClient.getHomeserverUrl();
+	if (size > 0) {
+		return `${baseUrl}/_matrix/client/v1/media/thumbnail/${serverName}/${mediaId}?width=${size}&height=${size}&method=crop`;
+	}
+	return `${baseUrl}/_matrix/client/v1/media/download/${serverName}/${mediaId}`;
+}
+
+/** Fetch a URL with the Matrix Authorization header for homeserver media URLs. */
+export async function fetchMediaWithAuth(url: string): Promise<string | null> {
+	if (!matrixClient) return null;
+	const accessToken = matrixClient.getAccessToken();
+	const baseUrl = matrixClient.getHomeserverUrl();
+	const headers: Record<string, string> = {};
+	if (accessToken && url.startsWith(baseUrl)) {
+		headers.Authorization = `Bearer ${accessToken}`;
+	}
+	try {
+		const res = await fetch(url, { headers });
+		if (!res.ok) return null;
+		const blob = await res.blob();
+		return URL.createObjectURL(blob);
+	} catch {
+		return null;
+	}
 }
 
 export interface UrlPreview {
@@ -255,13 +300,9 @@ export async function getUrlPreview(url: string): Promise<UrlPreview | null> {
 	try {
 		const data = await matrixClient.getUrlPreview(url, Date.now());
 		const ogImage = data['og:image'] as string | undefined;
-		const imageUrl = ogImage?.startsWith('mxc://')
-			? matrixClient.mxcUrlToHttp(ogImage, 800, 600, 'scale') || undefined
-			: ogImage;
+		const imageUrl = ogImage?.startsWith('mxc://') ? mxcToHttp(ogImage, 800) ?? undefined : ogImage;
 		const rawVideo = (data['og:video:secure_url'] ?? data['og:video:url'] ?? data['og:video']) as string | undefined;
-		const videoUrl = rawVideo?.startsWith('mxc://')
-			? matrixClient.mxcUrlToHttp(rawVideo, 0, 0, 'scale') || undefined
-			: rawVideo;
+		const videoUrl = rawVideo?.startsWith('mxc://') ? mxcToHttp(rawVideo, 0) ?? undefined : rawVideo;
 		return {
 			title: data['og:title'] as string | undefined,
 			description: data['og:description'] as string | undefined,
@@ -386,6 +427,27 @@ export async function loadPreviousMessages(room: Room): Promise<boolean> {
 export async function sendReadReceipt(event: MatrixEvent): Promise<void> {
 	if (!matrixClient) return;
 	await matrixClient.sendReadReceipt(event);
+}
+
+export async function sendTyping(roomId: string, isTyping: boolean): Promise<void> {
+	if (!matrixClient) return;
+	try {
+		await matrixClient.sendTyping(roomId, isTyping, 5000);
+	} catch {
+		// ignore typing errors
+	}
+}
+
+export function onTypingEvent(room: Room, callback: (userIds: string[]) => void): () => void {
+	if (!matrixClient) return () => {};
+	const myId = matrixClient.getUserId();
+	const handler = (_event: unknown, member: RoomMember) => {
+		if (member.roomId !== room.roomId) return;
+		const typing = room.getMembers().filter((m) => m.typing && m.userId !== myId).map((m) => m.userId);
+		callback(typing);
+	};
+	matrixClient.on(RoomMemberEvent.Typing as never, handler as never);
+	return () => matrixClient?.off(RoomMemberEvent.Typing as never, handler as never);
 }
 
 export interface SpaceChildInfo {

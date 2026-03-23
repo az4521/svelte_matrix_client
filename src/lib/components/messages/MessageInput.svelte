@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { MatrixEvent, Room } from 'matrix-js-sdk';
-	import { sendTextMessage, sendFormattedMessage, sendReply, sendSticker, sendFile, getMemberName, getCustomEmojis, type CustomEmoji, type CustomSticker } from '$lib/matrix/client';
+	import { sendTextMessage, sendFormattedMessage, sendReply, sendSticker, sendFile, getMemberName, getCustomEmojis, sendTyping, onTypingEvent, type CustomEmoji, type CustomSticker } from '$lib/matrix/client';
 	import EmojiPicker from '$lib/components/ui/EmojiPicker.svelte';
 	import StickerPicker from '$lib/components/ui/StickerPicker.svelte';
 	import GifPicker from '$lib/components/ui/GifPicker.svelte';
@@ -29,6 +29,25 @@
 	let fileQueue = $state<QueuedFile[]>([]);
 	let textareaEl: HTMLTextAreaElement | undefined = $state();
 	let fileInputEl: HTMLInputElement | undefined = $state();
+	let typingUsers = $state<string[]>([]);
+	let typingStopTimer: ReturnType<typeof setTimeout> | null = null;
+
+	// Subscribe to typing events for the current room
+	$effect(() => {
+		if (!room) return;
+		const currentRoom = room;
+		typingUsers = [];
+		return onTypingEvent(currentRoom, (userIds) => { typingUsers = userIds; });
+	});
+
+	function typingText(): string {
+		if (!room || typingUsers.length === 0) return '';
+		const names = typingUsers.slice(0, 3).map((id) => getMemberName(room!, id));
+		if (typingUsers.length === 1) return `${names[0]} is typing…`;
+		if (typingUsers.length === 2) return `${names[0]} and ${names[1]} are typing…`;
+		if (typingUsers.length === 3) return `${names[0]}, ${names[1]}, and ${names[2]} are typing…`;
+		return 'Several people are typing…';
+	}
 
 	export function focus() {
 		textareaEl?.focus();
@@ -93,6 +112,9 @@
 	async function send() {
 		const trimmed = text.trim();
 		if ((!trimmed && fileQueue.length === 0) || isSending || disabled) return;
+
+		if (typingStopTimer) { clearTimeout(typingStopTimer); typingStopTimer = null; }
+		if (room) sendTyping(room.roomId, false);
 
 		isSending = true;
 		const filesToSend = fileQueue.slice();
@@ -222,6 +244,12 @@
 		if (!textareaEl) return;
 		textareaEl.style.height = 'auto';
 		textareaEl.style.height = Math.min(textareaEl.scrollHeight, 200) + 'px';
+
+		if (room) {
+			sendTyping(room.roomId, true);
+			if (typingStopTimer) clearTimeout(typingStopTimer);
+			typingStopTimer = setTimeout(() => { if (room) sendTyping(room.roomId, false); }, 5000);
+		}
 	}
 
 	function getReplyPreview(): string {
@@ -427,9 +455,14 @@
 			{/if}
 		</button>
 	</div>
-	<p class="text-xs text-discord-textMuted mt-1 px-1">
-		<kbd class="font-mono">Enter</kbd> to send &middot;
-		<kbd class="font-mono">Shift+Enter</kbd> for new line
-		{#if replyToEvent}&middot; <kbd class="font-mono">Esc</kbd> to cancel reply{/if}
-	</p>
+	<div class="relative mt-1 px-1 h-4">
+		<p class="text-xs text-discord-textMuted">
+			<kbd class="font-mono">Enter</kbd> to send &middot;
+			<kbd class="font-mono">Shift+Enter</kbd> for new line
+			{#if replyToEvent}&middot; <kbd class="font-mono">Esc</kbd> to cancel reply{/if}
+		</p>
+		{#if typingUsers.length > 0}
+			<p class="absolute inset-0 text-xs text-discord-textMuted bg-discord-backgroundPrimary/90">{typingText()}</p>
+		{/if}
+	</div>
 </div>

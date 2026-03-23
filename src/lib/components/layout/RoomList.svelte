@@ -53,6 +53,7 @@
 
 	function roomButton(room: Room) {
 		const isActive = roomsState.activeRoomId === room.roomId;
+		roomsState.unreadTick; // track read receipt / new message changes
 		const unread = getUnreadCount(room);
 		return { isActive, unread };
 	}

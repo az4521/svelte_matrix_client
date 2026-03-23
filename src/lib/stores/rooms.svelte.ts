@@ -31,8 +31,13 @@ export const roomsState = $state({
 	roomsInSpace: [] as Room[],
 	spaceHierarchy: [] as SpaceChildInfo[],
 	hierarchyLoading: false,
-	isLoading: false
+	isLoading: false,
+	unreadTick: 0
 });
+
+export function bumpUnreadTick(): void {
+	roomsState.unreadTick++;
+}
 
 export function setActiveSpace(spaceId: string | null): void {
 	if (spaceId === roomsState.activeSpaceId) return;

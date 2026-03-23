@@ -2,6 +2,7 @@
 	import { getUrlPreview, type UrlPreview } from '$lib/matrix/client';
 	import Lightbox from '$lib/components/ui/Lightbox.svelte';
 	import { favouritesState, isFavouriteGif, addFavouriteGif, removeFavouriteGif } from '$lib/stores/favourites.svelte';
+	import { mediaStore } from '$lib/stores/media.svelte';
 
 	interface Props {
 		url: string;
@@ -89,9 +90,9 @@
 	{:else if showInline && preview.imageUrl && !imageError}
 		<!-- Direct image embed — same style as uploaded images -->
 		<div class="relative inline-block group/media mt-1">
-			<a href={preview.imageUrl} target="_blank" rel="noopener noreferrer" onclick={(e) => { e.preventDefault(); lightboxOpen = true; }}>
+			<a href={mediaStore.resolve(preview.imageUrl) ?? preview.imageUrl} target="_blank" rel="noopener noreferrer" onclick={(e) => { e.preventDefault(); lightboxOpen = true; }}>
 				<img
-					src={preview.imageUrl}
+					src={mediaStore.resolve(preview.imageUrl)}
 					alt=""
 					class="max-w-sm max-h-72 rounded-lg object-contain cursor-pointer block"
 					loading="lazy"
@@ -115,7 +116,7 @@
 			</button>
 		</div>
 		{#if lightboxOpen}
-			<Lightbox src={preview.imageUrl} alt="" onClose={() => (lightboxOpen = false)} />
+			<Lightbox src={mediaStore.resolve(preview.imageUrl) ?? preview.imageUrl} alt="" onClose={() => (lightboxOpen = false)} />
 		{/if}
 	{:else if !showInline}
 		<!-- Regular link preview card -->
@@ -145,7 +146,7 @@
 				<!-- Preview image -->
 				{#if preview.imageUrl && !imageError}
 					<img
-						src={preview.imageUrl}
+						src={mediaStore.resolve(preview.imageUrl)}
 						alt={preview.title ?? ''}
 						onerror={() => (imageError = true)}
 						class={imageOnRight

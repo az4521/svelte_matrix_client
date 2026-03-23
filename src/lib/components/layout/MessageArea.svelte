@@ -20,6 +20,7 @@
 		sendReadReceipt
 	} from '$lib/matrix/client';
 	import { getMessages, setMessages, appendMessage, canLoadMore, setCanLoadMore, bumpReactionTick } from '$lib/stores/messages.svelte';
+	import { bumpUnreadTick } from '$lib/stores/rooms.svelte';
 
 	interface Props {
 		room: Room;
@@ -88,6 +89,7 @@
 	$effect(() => {
 		const currentRoomId = roomId; // capture for closure
 		const unsub = onTimelineEvent((event: MatrixEvent, eventRoom: Room) => {
+			bumpUnreadTick();
 			if (eventRoom.roomId === currentRoomId) {
 				appendMessage(currentRoomId, event);
 				if (isAtBottom) {
@@ -138,7 +140,10 @@
 	function markAsRead() {
 		const msgs = getMessages(roomId);
 		const last = msgs[msgs.length - 1];
-		if (last) sendReadReceipt(last).catch(() => {});
+		if (last) {
+			sendReadReceipt(last).catch(() => {});
+			bumpUnreadTick();
+		}
 	}
 
 	function scrollToBottom(instant: boolean) {

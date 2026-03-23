@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { mediaStore } from '$lib/stores/media.svelte';
+
 	interface Props {
 		src?: string | null;
 		name?: string;
@@ -7,6 +9,8 @@
 	}
 
 	let { src = null, name = '?', size = 40, rounded = 'full' }: Props = $props();
+
+	const resolvedSrc = $derived(mediaStore.resolve(src));
 
 	const initials = $derived(() => {
 		if (!name) return '?';
@@ -43,10 +47,10 @@
 
 <div
 	class="flex-shrink-0 flex items-center justify-center overflow-hidden {roundedClass()}"
-	style="width: {size}px; height: {size}px; background-color: {src ? 'transparent' : bgColor()};"
+	style="width: {size}px; height: {size}px; background-color: {resolvedSrc ? 'transparent' : bgColor()};"
 >
-	{#if src}
-		<img {src} alt={name} class="w-full h-full object-cover {roundedClass()}" />
+	{#if resolvedSrc}
+		<img src={resolvedSrc} alt={name} class="w-full h-full object-cover {roundedClass()}" />
 	{:else}
 		<span class="text-white font-semibold select-none" style="font-size: {size * 0.4}px;">
 			{initials()}

@@ -3,6 +3,7 @@
 	import { EMOJI_CATEGORIES, ALL_EMOJIS } from '$lib/data/emojis';
 	import { getCustomEmojiPacks, getOwnAvatarUrl, type CustomEmoji } from '$lib/matrix/client';
 	import { roomsState } from '$lib/stores/rooms.svelte';
+	import { mediaStore } from '$lib/stores/media.svelte';
 	import { renderEmoji } from '$lib/utils/twemoji';
 
 	interface Props {
@@ -266,13 +267,13 @@
 				>
 					{#if tab.isCustom}
 						{#if tab.id === 'user' && ownAvatarUrl}
-							<img src={ownAvatarUrl} alt="My emojis" class="w-5 h-5 rounded-full object-cover" />
+							<img src={mediaStore.resolve(ownAvatarUrl)} alt="My emojis" class="w-5 h-5 rounded-full object-cover" />
 						{:else if tab.id === 'user'}
 							<svg class="w-5 h-5 text-discord-textPrimary" fill="currentColor" viewBox="0 0 24 24">
 								<path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
 							</svg>
 						{:else if tab.avatarUrl}
-							<img src={tab.avatarUrl} alt={tab.label} class="w-5 h-5 rounded-full object-cover" />
+							<img src={mediaStore.resolve(tab.avatarUrl)} alt={tab.label} class="w-5 h-5 rounded-full object-cover" />
 						{:else}
 							<span class="w-5 h-5 rounded-full bg-discord-accent flex items-center justify-center text-white text-xs font-bold">
 								{tab.label[0]?.toUpperCase() ?? '?'}
@@ -305,7 +306,7 @@
 							class:ring-2={selectedIndex === globalIdx}
 							class:ring-discord-accent={selectedIndex === globalIdx}
 						>
-							<img src={e.url} alt={e.shortcode} class="w-8 h-8 object-contain" loading="lazy" />
+							<img src={mediaStore.resolve(e.url)} alt={e.shortcode} class="w-8 h-8 object-contain" loading="lazy" />
 						</button>
 					{/each}
 				</div>
@@ -350,7 +351,7 @@
 									class:ring-2={selectedIndex === globalIdx}
 									class:ring-discord-accent={selectedIndex === globalIdx}
 								>
-									<img src={e.url} alt={e.shortcode} class="w-8 h-8 object-contain" loading="lazy" />
+									<img src={mediaStore.resolve(e.url)} alt={e.shortcode} class="w-8 h-8 object-contain" loading="lazy" />
 								</button>
 							{/each}
 						</div>
