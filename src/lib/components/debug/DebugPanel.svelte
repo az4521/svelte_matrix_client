@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { Room } from 'matrix-js-sdk';
-	import { getClient, onSyncPrepared } from '$lib/matrix/client';
+	import type { Room, MatrixEvent } from 'matrix-js-sdk';
+	import { getClient, getRawUrlPreview } from '$lib/matrix/client';
 	import { getMessages } from '$lib/stores/messages.svelte';
 	import { tick } from 'svelte';
 
@@ -55,7 +55,7 @@
 		return String(status);
 	}
 
-	function eventSummary(e: ReturnType<typeof room.getLiveTimeline>['getEvents'][0]) {
+	function eventSummary(e: MatrixEvent) {
 		const type = e.getType();
 		const sender = e.getSender() ?? '?';
 		const id = e.getId() ?? '?';
@@ -76,6 +76,18 @@
 		const body = content?.body as string | undefined;
 		if (!body) return JSON.stringify(content).slice(0, 80);
 		return body.slice(0, 60) + (body.length > 60 ? '…' : '');
+	}
+
+	let previewUrl = $state('');
+	let previewResult = $state<Record<string, unknown> | null>(null);
+	let previewLoading = $state(false);
+
+	async function fetchPreview() {
+		if (!previewUrl.trim()) return;
+		previewLoading = true;
+		previewResult = null;
+		previewResult = await getRawUrlPreview(previewUrl.trim());
+		previewLoading = false;
 	}
 
 	let copyDone = $state(false);
@@ -131,6 +143,31 @@
 			</div>
 
 			<div class="flex-1 overflow-y-auto font-mono text-xs">
+				<!-- URL Preview Inspector -->
+				<section>
+					<div class="sticky top-0 px-3 py-1 bg-[#1a0d1a] border-b border-[#333] text-pink-400 font-bold">
+						URL PREVIEW INSPECTOR
+					</div>
+					<div class="px-3 py-2 flex gap-2">
+						<input
+							bind:value={previewUrl}
+							onkeydown={(e) => e.key === 'Enter' && fetchPreview()}
+							placeholder="https://..."
+							class="flex-1 bg-[#0d0d1a] border border-[#333] rounded px-2 py-1 text-[#e0e0e0] outline-none focus:border-pink-400 text-xs"
+						/>
+						<button
+							onclick={fetchPreview}
+							disabled={previewLoading}
+							class="px-2 py-1 rounded bg-[#2a1a2a] hover:bg-[#3a2a3a] disabled:opacity-50 text-xs"
+						>
+							{previewLoading ? '…' : 'fetch'}
+						</button>
+					</div>
+					{#if previewResult !== null}
+						<pre class="px-3 pb-3 text-[11px] text-green-300 whitespace-pre-wrap break-all">{JSON.stringify(previewResult, null, 2)}</pre>
+					{/if}
+				</section>
+
 				<!-- Store messages -->
 				<section>
 					<div class="sticky top-0 px-3 py-1 bg-[#0d1a0d] border-b border-[#333] text-green-400 font-bold">

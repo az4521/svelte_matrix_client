@@ -44,7 +44,7 @@
 
 	const senderId = $derived(event.getSender() ?? '');
 	const displayName = $derived(getMemberName(room, senderId));
-	const avatarSrc = $derived(getMemberAvatar(room, senderId, 40));
+	const avatarSrc = $derived(getMemberAvatar(room, senderId));
 	const timestamp = $derived(event.getTs());
 	const content = $derived.by(() => { reactionTick; return event.getContent(); });
 	const eventType = $derived(event.getType());

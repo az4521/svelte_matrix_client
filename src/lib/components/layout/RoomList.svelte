@@ -150,7 +150,7 @@
 				</p>
 				{#each roomsState.directRooms as room (room.roomId)}
 					{@const { isActive, unread } = roomButton(room)}
-					{@const avatarSrc = getRoomAvatar(room, 32)}
+					{@const avatarSrc = getRoomAvatar(room)}
 					<button
 						onclick={() => setActiveRoom(room.roomId)}
 						class="w-full flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-left"

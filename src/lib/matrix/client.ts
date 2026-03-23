@@ -265,6 +265,23 @@ export function mxcToHttp(mxcUrl: string | null | undefined, size = 0): string |
 	return `${baseUrl}/_matrix/client/v1/media/download/${serverName}/${mediaId}`;
 }
 
+/** HEAD-request a URL (with auth for homeserver URLs) and return its Content-Type. */
+export async function getContentType(url: string): Promise<string | null> {
+	if (!matrixClient) return null;
+	const accessToken = matrixClient.getAccessToken();
+	const baseUrl = matrixClient.getHomeserverUrl();
+	const headers: Record<string, string> = {};
+	if (accessToken && url.startsWith(baseUrl)) {
+		headers.Authorization = `Bearer ${accessToken}`;
+	}
+	try {
+		const res = await fetch(url, { method: 'HEAD', headers });
+		return res.ok ? res.headers.get('content-type') : null;
+	} catch {
+		return null;
+	}
+}
+
 /** Fetch a URL with the Matrix Authorization header for homeserver media URLs. */
 export async function fetchMediaWithAuth(url: string): Promise<string | null> {
 	if (!matrixClient) return null;
@@ -293,6 +310,18 @@ export interface UrlPreview {
 	videoUrl?: string;
 	siteName?: string;
 	canonicalUrl?: string;
+	/** MIME type or og:type returned by the homeserver preview (e.g. "video/mp4") */
+	contentType?: string;
+}
+
+/** Returns the raw homeserver URL preview response object, useful for debugging. */
+export async function getRawUrlPreview(url: string): Promise<Record<string, unknown> | null> {
+	if (!matrixClient) return null;
+	try {
+		return await matrixClient.getUrlPreview(url, Date.now()) as Record<string, unknown>;
+	} catch (e) {
+		return { error: String(e) };
+	}
 }
 
 export async function getUrlPreview(url: string): Promise<UrlPreview | null> {
@@ -312,6 +341,7 @@ export async function getUrlPreview(url: string): Promise<UrlPreview | null> {
 			videoUrl,
 			siteName: data['og:site_name'] as string | undefined,
 			canonicalUrl: (data['og:url'] as string | undefined) ?? url,
+			contentType: data['og:type'] as string | undefined,
 		};
 	} catch {
 		return null;
@@ -651,7 +681,7 @@ export function getCustomEmojiPacks(activeSpaceId: string | null, spaces: Room[]
 		if (spaceRoom) {
 			const emojis = extractRoomEmojis(spaceRoom);
 			if (emojis.length > 0) {
-				const avatarUrl = getRoomAvatar(spaceRoom, 32) ?? undefined;
+				const avatarUrl = getRoomAvatar(spaceRoom) ?? undefined;
 				packs.push({ id: activeSpaceId, name: spaceRoom.name || 'Space', avatarUrl, emojis });
 			}
 		}
@@ -673,7 +703,7 @@ export function getCustomStickerPacks(activeSpaceId: string | null): CustomStick
 		if (spaceRoom) {
 			const stickers = extractRoomStickers(spaceRoom);
 			if (stickers.length > 0) {
-				const avatarUrl = getRoomAvatar(spaceRoom, 32) ?? undefined;
+				const avatarUrl = getRoomAvatar(spaceRoom) ?? undefined;
 				packs.push({ id: activeSpaceId, name: spaceRoom.name || 'Space', avatarUrl, stickers });
 			}
 		}

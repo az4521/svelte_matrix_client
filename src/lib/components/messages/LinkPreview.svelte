@@ -13,7 +13,6 @@
 	let preview = $state<UrlPreview | null>(null);
 	let imageError = $state(false);
 	let lightboxOpen = $state(false);
-
 	// Reactively track favourite state — isFavouriteGif reads favouritesState.gifs ($state) so this auto-tracks
 	const favourited = $derived(isFavouriteGif(url));
 
@@ -50,6 +49,7 @@
 	});
 
 	const showInline = $derived(isDirect || (isTenor && !!(preview?.videoUrl || preview?.imageUrl)));
+
 
 	// Decide layout for card previews: tall image goes on the right, wide image below
 	const imageOnRight = $derived.by(() => {
@@ -159,3 +159,4 @@
 		</a>
 	{/if}
 {/if}
+

@@ -40,7 +40,7 @@
 
 	const rootEvent = $derived(findEventById(room, rootEventId));
 	const rootSender = $derived(rootEvent ? getMemberName(room, rootEvent.getSender() ?? '') : '');
-	const rootAvatar = $derived(rootEvent ? getMemberAvatar(room, rootEvent.getSender() ?? '', 40) : null);
+	const rootAvatar = $derived(rootEvent ? getMemberAvatar(room, rootEvent.getSender() ?? '') : null);
 	const rootBody = $derived.by(() => {
 		if (!rootEvent) return '';
 		const c = rootEvent.getContent();

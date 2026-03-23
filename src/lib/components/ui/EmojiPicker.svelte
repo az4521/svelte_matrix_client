@@ -42,7 +42,7 @@
 	}
 
 	const customPacks = $derived(getCustomEmojiPacks(roomsState.activeSpaceId, roomsState.spaces));
-	const ownAvatarUrl = $derived(getOwnAvatarUrl(40));
+	const ownAvatarUrl = $derived(getOwnAvatarUrl());
 
 	const tabs = $derived([
 		...customPacks.map((p) => ({ id: p.id, label: p.name, avatarUrl: p.avatarUrl, isCustom: true as const })),

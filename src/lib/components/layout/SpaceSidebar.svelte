@@ -38,7 +38,7 @@
 	<!-- Space icons -->
 	{#each roomsState.spaces as space (space.roomId)}
 		{@const isActive = roomsState.activeSpaceId === space.roomId}
-		{@const avatarSrc = getRoomAvatar(space, 48)}
+		{@const avatarSrc = getRoomAvatar(space)}
 		<button
 			onclick={() => setActiveSpace(space.roomId)}
 			class="group relative w-12 h-12 flex items-center justify-center transition-all duration-200 flex-shrink-0"
