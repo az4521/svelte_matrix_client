@@ -20,6 +20,17 @@
 
 	let directEmbed = $state<DirectEmbed | null>(null);
 
+	interface TweetEmbed {
+		authorName: string;
+		authorHandle: string;
+		text: string;
+		photos: string[];
+		videos: string[];
+	}
+
+	let tweetEmbed = $state<TweetEmbed | null>(null);
+	let lightboxTweetIndex = $state<number | null>(null);
+
 	// Reactively track favourite state — isFavouriteGif reads favouritesState.gifs ($state) so this auto-tracks
 	const favourited = $derived(isFavouriteGif(url));
 
@@ -48,27 +59,26 @@
 		return null;
 	}
 
-	function getFixUrl(rawUrl: string): string | null {
+	function getTwitterApiUrl(rawUrl: string): string | null {
 		try {
 			const u = new URL(rawUrl);
 			const h = u.hostname.replace(/^www\./, '');
-			if (h === 'x.com' || h === 'twitter.com') { u.hostname = 'fixupx.com'; return u.toString(); }
-			if (h === 'instagram.com' || h === 'kkinstagram.com') { u.hostname = 'vxinstagram.com'; return u.toString(); }
+			if (h !== 'x.com' && h !== 'twitter.com') return null;
+			// Path: /{user}/status/{id}
+			const m = u.pathname.match(/^\/([^/]+)\/status\/(\d+)/);
+			if (!m) return null;
+			return `https://api.fxtwitter.com/${m[1]}/status/${m[2]}`;
 		} catch { /* */ }
 		return null;
 	}
 
-	async function fetchOgTags(fetchUrl: string): Promise<Record<string, string>> {
-		const res = await fetch(fetchUrl);
-		const html = await res.text();
-		const tags: Record<string, string> = {};
-		for (const match of html.matchAll(/<meta[^>]+>/gi)) {
-			const tag = match[0];
-			const prop = tag.match(/property="og:([^"]+)"/i)?.[1];
-			const content = tag.match(/content="([^"]*)"/i)?.[1];
-			if (prop && content !== undefined) tags[prop] = content;
-		}
-		return tags;
+	function getInstagramFixUrl(rawUrl: string): string | null {
+		try {
+			const u = new URL(rawUrl);
+			const h = u.hostname.replace(/^www\./, '');
+			if (h === 'instagram.com' || h === 'kkinstagram.com') { u.hostname = 'vxinstagram.com'; return u.toString(); }
+		} catch { /* */ }
+		return null;
 	}
 
 	$effect(() => {
@@ -76,6 +86,7 @@
 		preview = null;
 		imageError = false;
 		directEmbed = null;
+		tweetEmbed = null;
 
 		const ytUrl = getYoutubeEmbedUrl(currentUrl);
 		if (ytUrl) {
@@ -83,22 +94,30 @@
 			return;
 		}
 
-		const fixUrl = getFixUrl(currentUrl);
-		if (fixUrl) {
-			fetchOgTags(fixUrl).then(tags => {
-				const videoUrl = tags['video:secure_url'] || tags['video:url'] || tags['video'];
-				if (videoUrl) {
-					directEmbed = { type: 'video', videoUrl };
-				} else {
-					// Image-only post — fall back to homeserver preview using the fix URL
-					getUrlPreview(fixUrl).then(data => {
-						if (data && (data.title || data.imageUrl || data.videoUrl)) preview = data;
-					});
-				}
-			}).catch(() => {
-				getUrlPreview(fixUrl).then(data => {
-					if (data && (data.title || data.imageUrl || data.videoUrl)) preview = data;
+		// Twitter/X: use fxtwitter JSON API (has CORS headers)
+		const twitterApiUrl = getTwitterApiUrl(currentUrl);
+		if (twitterApiUrl) {
+			fetch(twitterApiUrl, { headers: { Accept: 'application/json' } })
+				.then(r => r.json())
+				.then((data: any) => {
+					const tweet = data?.tweet;
+					if (!tweet) return;
+					tweetEmbed = {
+						authorName: tweet.author?.name ?? '',
+						authorHandle: tweet.author?.screen_name ?? '',
+						text: tweet.text ?? '',
+						photos: (tweet.media?.photos ?? []).map((p: any) => p.url as string),
+						videos: (tweet.media?.videos ?? []).map((v: any) => v.url as string),
+					};
 				});
+			return;
+		}
+
+		// Instagram: no CORS-friendly API — use homeserver preview via vxinstagram
+		const igFixUrl = getInstagramFixUrl(currentUrl);
+		if (igFixUrl) {
+			getUrlPreview(igFixUrl).then(data => {
+				if (data && (data.title || data.imageUrl)) preview = data;
 			});
 			return;
 		}
@@ -141,6 +160,69 @@
 		controls
 		preload="metadata"
 	></video>
+{:else if tweetEmbed}
+	<!-- Twitter/X card built from fxtwitter API -->
+	<div class="mt-2">
+		<a
+			href={url}
+			target="_blank"
+			rel="noopener noreferrer"
+			class="flex max-w-lg rounded overflow-hidden border border-discord-divider bg-discord-backgroundSecondary hover:bg-discord-messageHover transition-colors no-underline"
+		>
+			<!-- Left accent bar -->
+			<div class="w-1 flex-shrink-0 bg-discord-accent"></div>
+
+			<div class="flex flex-1 min-w-0 flex-col p-3 gap-2">
+				<!-- Author -->
+				<div class="flex flex-col min-w-0">
+					<p class="text-xs text-discord-textMuted mb-0.5">X / Twitter</p>
+					<p class="text-sm font-semibold text-discord-accent leading-snug">{tweetEmbed.authorName} <span class="font-normal text-discord-textMuted">@{tweetEmbed.authorHandle}</span></p>
+					{#if tweetEmbed.text}
+						<p class="text-xs text-discord-textSecondary mt-1 leading-relaxed line-clamp-4 whitespace-pre-wrap">{tweetEmbed.text}</p>
+					{/if}
+				</div>
+
+				<!-- Media grid -->
+				{#if tweetEmbed.videos.length > 0 || tweetEmbed.photos.length > 0}
+					{@const allMedia = [...tweetEmbed.videos.map(v => ({ type: 'video' as const, url: v })), ...tweetEmbed.photos.map(p => ({ type: 'photo' as const, url: p }))]}
+					<div
+						class="grid gap-1 rounded overflow-hidden"
+						style="grid-template-columns: repeat({Math.min(allMedia.length, 2)}, 1fr)"
+					>
+						{#each allMedia as item, i}
+							{#if item.type === 'video'}
+								<!-- svelte-ignore a11y_media_has_caption -->
+								<video
+									src={mediaStore.resolveNoReferrer(item.url) ?? undefined}
+									class="w-full max-h-72 object-contain rounded"
+									controls
+									preload="metadata"
+									onclick={(e) => e.preventDefault()}
+								></video>
+							{:else}
+								<!-- svelte-ignore a11y_click_events_have_key_events -->
+								<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+								<img
+									src={item.url}
+									alt=""
+									class="w-full max-h-72 object-contain rounded cursor-pointer bg-black/10"
+									loading="lazy"
+									onclick={(e) => { e.preventDefault(); lightboxTweetIndex = i; }}
+								/>
+							{/if}
+						{/each}
+					</div>
+				{/if}
+			</div>
+		</a>
+		{#if lightboxTweetIndex !== null}
+			{@const allMedia = [...tweetEmbed.videos.map(v => ({ type: 'video' as const, url: v })), ...tweetEmbed.photos.map(p => ({ type: 'photo' as const, url: p }))]}
+			{@const item = allMedia[lightboxTweetIndex]}
+			{#if item?.type === 'photo'}
+				<Lightbox src={item.url} alt="" onClose={() => (lightboxTweetIndex = null)} />
+			{/if}
+		{/if}
+	</div>
 {:else if preview}
 	{#if showInline && preview.videoUrl}
 		<!-- Direct video embed -->
@@ -201,40 +283,48 @@
 		{/if}
 	{:else if !showInline}
 		<!-- Regular link preview card -->
-		<a
-			href={preview.canonicalUrl ?? url}
-			target="_blank"
-			rel="noopener noreferrer"
-			class="flex mt-2 max-w-lg rounded overflow-hidden border border-discord-divider bg-discord-backgroundSecondary hover:bg-discord-messageHover transition-colors no-underline"
-		>
-			<!-- Left accent bar -->
-			<div class="w-1 flex-shrink-0 bg-discord-accent"></div>
+		<div class="mt-2">
+			<a
+				href={preview.canonicalUrl ?? url}
+				target="_blank"
+				rel="noopener noreferrer"
+				class="flex max-w-lg rounded overflow-hidden border border-discord-divider bg-discord-backgroundSecondary hover:bg-discord-messageHover transition-colors no-underline"
+			>
+				<!-- Left accent bar -->
+				<div class="w-1 flex-shrink-0 bg-discord-accent"></div>
 
-			<div class="flex flex-1 min-w-0 flex-col p-3 gap-3">
-				<!-- Text content -->
-				<div class="flex-1 min-w-0">
-					{#if preview.siteName}
-						<p class="text-xs text-discord-textMuted mb-0.5 truncate">{preview.siteName}</p>
-					{/if}
-					{#if preview.title}
-						<p class="text-sm font-semibold text-discord-accent leading-snug line-clamp-2">{preview.title}</p>
-					{/if}
-					{#if preview.description}
-						<p class="text-xs text-discord-textSecondary mt-1 leading-relaxed line-clamp-3">{preview.description}</p>
+				<div class="flex flex-1 min-w-0 flex-col p-3 gap-3">
+					<!-- Text content -->
+					<div class="flex-1 min-w-0">
+						{#if preview.siteName}
+							<p class="text-xs text-discord-textMuted mb-0.5 truncate">{preview.siteName}</p>
+						{/if}
+						{#if preview.title}
+							<p class="text-sm font-semibold text-discord-accent leading-snug line-clamp-2">{preview.title}</p>
+						{/if}
+						{#if preview.description}
+							<p class="text-xs text-discord-textSecondary mt-1 leading-relaxed line-clamp-3">{preview.description}</p>
+						{/if}
+					</div>
+
+					<!-- Preview image -->
+					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+					{#if preview.imageUrl && !imageError}
+						<!-- svelte-ignore a11y_click_events_have_key_events -->
+						<img
+							src={mediaStore.resolve(preview.imageUrl)}
+							alt={preview.title ?? ''}
+							onerror={() => (imageError = true)}
+							class="max-w-full max-h-72 rounded mt-1 object-contain cursor-pointer"
+							loading="lazy"
+							onclick={(e) => { e.preventDefault(); lightboxOpen = true; }}
+						/>
 					{/if}
 				</div>
-
-				<!-- Preview image -->
-				{#if preview.imageUrl && !imageError}
-					<img
-						src={mediaStore.resolve(preview.imageUrl)}
-						alt={preview.title ?? ''}
-						onerror={() => (imageError = true)}
-						class="max-w-full max-h-72 rounded mt-1 object-contain"
-						loading="lazy"
-					/>
-				{/if}
-			</div>
-		</a>
+			</a>
+			{#if lightboxOpen && preview.imageUrl}
+				<Lightbox src={mediaStore.resolve(preview.imageUrl) ?? preview.imageUrl} alt="" onClose={() => (lightboxOpen = false)} />
+			{/if}
+		</div>
 	{/if}
 {/if}

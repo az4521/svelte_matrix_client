@@ -27,6 +27,30 @@ class MediaStore {
 		}
 		return null;
 	}
+
+	/**
+	 * Fetches an external URL as a blob with no Referer header, returning a
+	 * blob URL. Use for CDN resources that block cross-origin Referer headers
+	 * (e.g. video.twimg.com). Returns null until the fetch completes.
+	 */
+	resolveNoReferrer(url: string | null | undefined): string | null {
+		if (!url) return null;
+
+		const cached = this.cache[url];
+		if (cached) return cached;
+
+		if (!this.fetching.has(url)) {
+			this.fetching.add(url);
+			fetch(url, { referrerPolicy: 'no-referrer' })
+				.then(r => r.ok ? r.blob() : null)
+				.then(blob => {
+					this.fetching.delete(url);
+					if (blob) this.cache[url] = URL.createObjectURL(blob);
+				})
+				.catch(() => { this.fetching.delete(url); });
+		}
+		return null;
+	}
 }
 
 export const mediaStore = new MediaStore();

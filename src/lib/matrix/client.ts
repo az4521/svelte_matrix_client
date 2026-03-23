@@ -305,8 +305,6 @@ export interface UrlPreview {
 	title?: string;
 	description?: string;
 	imageUrl?: string;
-	imageWidth?: number;
-	imageHeight?: number;
 	videoUrl?: string;
 	siteName?: string;
 	canonicalUrl?: string;
@@ -336,8 +334,7 @@ export async function getUrlPreview(url: string): Promise<UrlPreview | null> {
 			title: data['og:title'] as string | undefined,
 			description: data['og:description'] as string | undefined,
 			imageUrl,
-			imageWidth: data['og:image:width'] as number | undefined,
-			imageHeight: data['og:image:height'] as number | undefined,
+
 			videoUrl,
 			siteName: data['og:site_name'] as string | undefined,
 			canonicalUrl: (data['og:url'] as string | undefined) ?? url,

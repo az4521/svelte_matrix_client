@@ -18,7 +18,7 @@
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
 	class="fixed inset-0 z-[9998] flex items-center justify-center bg-black/80"
-	onclick={onClose}
+	onclick={(e) => { e.stopPropagation(); onClose(); }}
 >
 	<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 	<img
