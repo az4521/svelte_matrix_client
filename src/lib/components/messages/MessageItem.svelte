@@ -206,16 +206,14 @@
 		if (editRequested) {
 			editFromKeyboard = true;
 			startEdit();
-			tick().then(() => {
-				rootEl?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-				editTextareaEl?.focus();
-			});
+			tick().then(() => editTextareaEl?.focus());
 		}
 	});
 
 	function startEdit() {
 		editText = body();
 		isEditing = true;
+		tick().then(() => rootEl?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
 	}
 
 	function cancelEdit() {
