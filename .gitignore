@@ -1,0 +1,52 @@
+# Node.js / Package manager dependencies
+node_modules/
+
+# Vite build output
+dist/
+dist-ssr/
+*.local
+
+# SvelteKit (Include this if you upgrade/switch to SvelteKit)
+.svelte-kit/
+
+# Environment files (Never commit your local secrets!)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Log files
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Testing coverage reports
+coverage/
+
+# OS-generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDEs and Editors
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# AI
+.claude/

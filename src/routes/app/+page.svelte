@@ -1,0 +1,178 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+
+	import SpaceSidebar from '$lib/components/layout/SpaceSidebar.svelte';
+	import RoomList from '$lib/components/layout/RoomList.svelte';
+	import MessageArea from '$lib/components/layout/MessageArea.svelte';
+
+	import { auth, clearSession } from '$lib/stores/auth.svelte';
+	import { roomsState, setActiveSpace } from '$lib/stores/rooms.svelte';
+	import { initFavourites } from '$lib/stores/favourites.svelte';
+	import {
+		getSpaces,
+		getOrphanRooms,
+		getDirectRooms,
+		getRoomsInSpace,
+		fetchSpaceHierarchy,
+		getRoom,
+		logout,
+		onRoomUpdate
+	} from '$lib/matrix/client';
+
+	let showSettings = $state(false);
+
+	// Redirect if not authenticated
+	$effect(() => {
+		if (!auth.isAuthenticated) {
+			goto('/');
+		}
+	});
+
+	function refreshRooms() {
+		roomsState.spaces = getSpaces();
+		roomsState.orphanRooms = getOrphanRooms();
+		roomsState.directRooms = getDirectRooms();
+		if (roomsState.activeSpaceId) {
+			roomsState.roomsInSpace = getRoomsInSpace(roomsState.activeSpaceId);
+		}
+	}
+
+	onMount(() => {
+		if (!auth.isAuthenticated) {
+			goto('/');
+			return;
+		}
+
+		refreshRooms();
+
+		const unsubRooms = onRoomUpdate(() => refreshRooms());
+		const unsubFavourites = initFavourites();
+		return () => { unsubRooms(); unsubFavourites(); };
+	});
+
+	// Update rooms list and fetch full hierarchy when selected space changes
+	$effect(() => {
+		const spaceId = roomsState.activeSpaceId; // only dependency we want
+		const rooms = spaceId ? getRoomsInSpace(spaceId) : [];
+		roomsState.roomsInSpace = rooms;
+
+		if (spaceId) {
+			roomsState.hierarchyLoading = true;
+			fetchSpaceHierarchy(spaceId).then((hierarchy) => {
+				// Only apply if the space hasn't changed while we were fetching
+				if (roomsState.activeSpaceId === spaceId) {
+					roomsState.spaceHierarchy = hierarchy;
+					roomsState.hierarchyLoading = false;
+				}
+			});
+		}
+	});
+
+	async function handleLogout() {
+		try {
+			await logout();
+		} finally {
+			clearSession();
+			goto('/');
+		}
+	}
+
+	// Derive directly from activeRoomId (a stable string) rather than the room arrays,
+	// so sync-triggered array refreshes don't invalidate this derived and remount MessageArea.
+	const activeRoom = $derived(
+		roomsState.activeRoomId ? getRoom(roomsState.activeRoomId) : null
+	);
+</script>
+
+<svelte:head>
+	<title>Matrix Client</title>
+</svelte:head>
+
+{#if !auth.isAuthenticated}
+	<div class="min-h-screen flex items-center justify-center bg-discord-backgroundTertiary">
+		<div class="flex items-center gap-3 text-discord-textMuted">
+			<div class="w-6 h-6 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+			<span>Redirecting…</span>
+		</div>
+	</div>
+{:else}
+	<div class="flex h-screen overflow-hidden bg-discord-background">
+		<!-- Sync state banner -->
+		{#if auth.syncState !== 'PREPARED' && auth.syncState !== 'SYNCING'}
+			<div class="absolute top-0 left-0 right-0 z-50 bg-discord-warning/90 text-discord-backgroundTertiary text-sm font-medium text-center py-1.5">
+				{#if auth.syncState === 'ERROR'}
+					Connection error — trying to reconnect…
+				{:else if auth.syncState === 'RECONNECTING'}
+					Reconnecting…
+				{:else}
+					Syncing…
+				{/if}
+			</div>
+		{/if}
+
+		<SpaceSidebar onHomeClick={() => setActiveSpace(null)} onSettingsClick={() => showSettings = !showSettings} />
+
+		<RoomList onLogout={handleLogout} />
+
+		<main class="flex flex-1 min-w-0 overflow-hidden bg-discord-background">
+			{#if activeRoom}
+				<MessageArea room={activeRoom} showMemberList={true} />
+			{:else}
+				<div class="flex-1 flex flex-col items-center justify-center text-center p-8">
+					<div class="w-24 h-24 rounded-full bg-discord-backgroundSecondary flex items-center justify-center mb-6">
+						<svg class="w-12 h-12 text-discord-textMuted" fill="currentColor" viewBox="0 0 24 24">
+							<path d="M5.88 2.39a1 1 0 1 0-1.94.49l.64 2.51A.85.85 0 0 1 3.72 6.5H2a1 1 0 0 0 0 2h1.27l-.63 2.47a1 1 0 1 0 1.94.49L5.5 8.5H9l-.63 2.47a1 1 0 1 0 1.94.49L11.24 8.5H13a1 1 0 0 0 0-2h-1.27l.7-2.73a1 1 0 0 0-1.94-.49L9.58 6.5H6.5l-.62-2.11z"/>
+						</svg>
+					</div>
+					<h2 class="text-2xl font-bold text-discord-textPrimary mb-2">
+						{roomsState.activeSpaceId === null ? 'Select a room' : 'Select a channel'}
+					</h2>
+					<p class="text-discord-textMuted max-w-sm">
+						{roomsState.activeSpaceId === null
+							? 'Choose a room or direct message from the sidebar to start chatting.'
+							: 'Choose a channel from the list on the left to start chatting.'}
+					</p>
+				</div>
+			{/if}
+		</main>
+
+		<!-- Settings overlay -->
+		{#if showSettings}
+			<div
+				class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+				role="presentation"
+				onclick={(e) => { if (e.target === e.currentTarget) showSettings = false; }}
+				onkeydown={(e) => { if (e.key === 'Escape') showSettings = false; }}
+			>
+				<div class="bg-discord-backgroundSecondary rounded-lg shadow-2xl p-6 w-96 max-w-full mx-4">
+					<h2 class="text-xl font-bold text-discord-textPrimary mb-4">Settings</h2>
+					<div class="space-y-3 text-sm">
+						<div class="flex justify-between items-center py-2 border-b border-discord-divider">
+							<span class="text-discord-textMuted font-medium">User ID</span>
+							<span class="text-discord-textPrimary font-mono text-xs">{auth.userId}</span>
+						</div>
+						<div class="flex justify-between items-center py-2 border-b border-discord-divider">
+							<span class="text-discord-textMuted font-medium">Homeserver</span>
+							<span class="text-discord-textPrimary text-xs">{auth.homeserverUrl}</span>
+						</div>
+						<div class="flex justify-between items-center py-2 border-b border-discord-divider">
+							<span class="text-discord-textMuted font-medium">Sync state</span>
+							<span class="text-discord-textPrimary text-xs">{auth.syncState}</span>
+						</div>
+					</div>
+					<div class="mt-6 flex gap-3">
+						<button
+							onclick={handleLogout}
+							class="flex-1 py-2 bg-discord-danger hover:bg-discord-danger/80 text-white rounded font-medium text-sm transition-colors"
+						>Log Out</button>
+						<button
+							onclick={() => showSettings = false}
+							class="flex-1 py-2 bg-discord-backgroundTertiary hover:bg-discord-messageHover text-discord-textPrimary rounded font-medium text-sm transition-colors"
+						>Close</button>
+					</div>
+				</div>
+			</div>
+		{/if}
+	</div>
+{/if}

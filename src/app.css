@@ -1,0 +1,149 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --discord-bg: #36393f;
+  --discord-bg-secondary: #2f3136;
+  --discord-bg-tertiary: #202225;
+  --discord-bg-dark: #202226;
+  --discord-text-primary: #dcddde;
+  --discord-text-secondary: #72767d;
+  --discord-text-muted: #4f545c;
+  --discord-accent: #5865F2;
+  --discord-accent-hover: #4752C4;
+  --discord-divider: #41444e;
+  --discord-online: #3BA55C;
+  --discord-idle: #FAA61A;
+  --discord-dnd: #ED4245;
+  --discord-offline: #747f8d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: var(--discord-bg);
+  color: var(--discord-text-primary);
+  font-family: 'gg sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+#app {
+  height: 100%;
+}
+
+/* Custom scrollbar — Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--discord-bg-tertiary) transparent;
+}
+
+/* Custom scrollbar — Webkit */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--discord-bg-tertiary);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--discord-text-muted);
+  background-clip: content-box;
+}
+
+/* Selection color */
+::selection {
+  background-color: var(--discord-accent);
+  color: white;
+}
+
+/* Utility classes */
+.flex-1 {
+  flex: 1;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Animation utilities */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.2s ease-out;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Focus styles */
+:focus-visible {
+  outline: 2px solid var(--discord-accent);
+  outline-offset: 2px;
+}
+
+/* Button hover effects */
+.btn-primary {
+  background-color: var(--discord-accent);
+  color: white;
+  transition: background-color 0.2s;
+}
+
+.btn-primary:hover {
+  background-color: var(--discord-accent-hover);
+}
+
+/* Input styles */
+.input-dark {
+  background-color: var(--discord-bg-secondary);
+  border: 1px solid transparent;
+  color: var(--discord-text-primary);
+  transition: border-color 0.2s;
+}
+
+.input-dark:focus {
+  border-color: var(--discord-accent);
+  outline: none;
+}
+
+.input-dark::placeholder {
+  color: var(--discord-text-muted);
+}

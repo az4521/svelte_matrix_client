@@ -1,0 +1,334 @@
+<script lang="ts">
+	import { tick, untrack } from 'svelte';
+	import type { Room, MatrixEvent } from 'matrix-js-sdk';
+	import { auth } from '$lib/stores/auth.svelte';
+	import MessageItem from '$lib/components/messages/MessageItem.svelte';
+	import MessageInput from '$lib/components/messages/MessageInput.svelte';
+	import MemberList from '$lib/components/layout/MemberList.svelte';
+	import DebugPanel from '$lib/components/debug/DebugPanel.svelte';
+	import {
+		getTimelineMessages,
+		onTimelineEvent,
+		onLocalEchoUpdated,
+		onSyncPrepared,
+		onReactionEvent,
+		onEditEvent,
+		onRedactionEvent,
+		loadPreviousMessages,
+		getRoomDisplayName,
+		getRoomTopic,
+		sendReadReceipt
+	} from '$lib/matrix/client';
+	import { getMessages, setMessages, appendMessage, canLoadMore, setCanLoadMore, bumpReactionTick } from '$lib/stores/messages.svelte';
+
+	interface Props {
+		room: Room;
+		showMemberList: boolean;
+	}
+
+	let { room, showMemberList = true }: Props = $props();
+
+	let scrollEl: HTMLDivElement | undefined = $state();
+	let messageInputEl: ReturnType<typeof MessageInput> | undefined = $state();
+	let isAtBottom = $state(true);
+	let loadingOlder = $state(false);
+	let replyToEvent = $state<MatrixEvent | null>(null);
+	let editRequestedEventId = $state<string | null>(null);
+
+	async function requestEditLastMessage() {
+		const editable = messages.filter(
+			(e) => e.getSender() === auth.userId &&
+				e.getType() === 'm.room.message' &&
+				e.getContent()?.msgtype === 'm.text' &&
+				e.getId()
+		);
+		if (editable.length === 0) return;
+		editRequestedEventId = editable[editable.length - 1].getId()!;
+		await tick();
+		editRequestedEventId = null;
+	}
+	// untrack avoids the "captures initial value" warning - we intentionally want the initial prop value
+	let showMemberListLocal = $state(untrack(() => showMemberList));
+
+	const roomId = $derived(room.roomId);
+	const roomName = $derived(getRoomDisplayName(room));
+	const topic = $derived(getRoomTopic(room));
+	const messages = $derived(getMessages(roomId));
+
+	// Clear reply when switching rooms
+	$effect(() => {
+		room.roomId; // track room changes
+		replyToEvent = null;
+	});
+
+	// Load messages when room changes — always reload from SDK state (fast, in-memory)
+	$effect(() => {
+		const id = room.roomId; // track room changes
+		untrack(() => {
+			const events = getTimelineMessages(room);
+			setMessages(id, events);
+		});
+		// Scroll to bottom on room change, then fill viewport if needed
+		tick().then(() => { scrollToBottom(true); autoFillMessages(); });
+	});
+
+	// Reload messages once the initial sync completes (catches messages missed during SYNCING state)
+	$effect(() => {
+		const currentRoom = room;
+		const currentRoomId = roomId;
+		const unsub = onSyncPrepared(() => {
+			setMessages(currentRoomId, getTimelineMessages(currentRoom));
+			autoFillMessages();
+			if (isAtBottom) markAsRead();
+		});
+		return unsub;
+	});
+
+	// Subscribe to new live timeline events (incoming and confirmed own messages)
+	$effect(() => {
+		const currentRoomId = roomId; // capture for closure
+		const unsub = onTimelineEvent((event: MatrixEvent, eventRoom: Room) => {
+			if (eventRoom.roomId === currentRoomId) {
+				appendMessage(currentRoomId, event);
+				if (isAtBottom) {
+					tick().then(() => scrollToBottom(false));
+				}
+			}
+		});
+		return unsub;
+	});
+
+	// Subscribe to local echo updates (own pending messages in Detached ordering mode)
+	$effect(() => {
+		const currentRoomId = roomId;
+		const unsub = onLocalEchoUpdated((eventRoom: Room) => {
+			if (eventRoom.roomId === currentRoomId) {
+				setMessages(currentRoomId, getTimelineMessages(room));
+				if (isAtBottom) {
+					tick().then(() => scrollToBottom(false));
+				}
+			}
+		});
+		return unsub;
+	});
+
+	// Subscribe to reaction and edit events to trigger re-renders
+	$effect(() => {
+		const currentRoomId = roomId;
+		const unsubReaction = onReactionEvent((_event: MatrixEvent, eventRoom: Room) => {
+			if (eventRoom.roomId === currentRoomId) bumpReactionTick();
+		});
+		const unsubEdit = onEditEvent((_event: MatrixEvent, eventRoom: Room) => {
+			if (eventRoom.roomId === currentRoomId) bumpReactionTick();
+		});
+		return () => { unsubReaction(); unsubEdit(); };
+	});
+
+	// Subscribe directly on the room object for redaction events (client does not re-emit these)
+	$effect(() => {
+		const currentRoom = room;
+		const currentRoomId = roomId;
+		const unsub = onRedactionEvent(currentRoom, () => {
+			setMessages(currentRoomId, getTimelineMessages(currentRoom));
+			bumpReactionTick();
+		});
+		return unsub;
+	});
+
+	function markAsRead() {
+		const msgs = getMessages(roomId);
+		const last = msgs[msgs.length - 1];
+		if (last) sendReadReceipt(last).catch(() => {});
+	}
+
+	function scrollToBottom(instant: boolean) {
+		if (!scrollEl) return;
+		scrollEl.scrollTo({
+			top: scrollEl.scrollHeight,
+			behavior: instant ? 'instant' : 'smooth'
+		});
+		markAsRead();
+	}
+
+	function onScroll() {
+		if (!scrollEl) return;
+		const { scrollTop, scrollHeight, clientHeight } = scrollEl;
+		const wasAtBottom = isAtBottom;
+		isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+
+		if (!wasAtBottom && isAtBottom) markAsRead();
+
+		// Load more when near the top
+		if (scrollTop < 200 && !loadingOlder) {
+			loadOlderMessages();
+		}
+	}
+
+	async function loadOlderMessages() {
+		if (loadingOlder || !canLoadMore(roomId)) return;
+		loadingOlder = true;
+		const prevScrollHeight = scrollEl?.scrollHeight ?? 0;
+
+		try {
+			const hasMore = await loadPreviousMessages(room);
+			if (!hasMore) setCanLoadMore(roomId, false);
+			const events = getTimelineMessages(room);
+			setMessages(roomId, events);
+
+			// Restore scroll position after prepending
+			await tick();
+			if (scrollEl) {
+				scrollEl.scrollTop = scrollEl.scrollHeight - prevScrollHeight;
+			}
+		} finally {
+			loadingOlder = false;
+		}
+	}
+
+	// Keep paginating until the content fills the viewport (or no more history)
+	async function autoFillMessages() {
+		await tick();
+		while (scrollEl && canLoadMore(roomId) && scrollEl.scrollHeight <= scrollEl.clientHeight) {
+			await loadOlderMessages();
+			await tick();
+		}
+	}
+
+	// Group consecutive messages from the same sender (within 5 min)
+	function shouldShowHeader(events: MatrixEvent[], index: number): boolean {
+		if (index === 0) return true;
+		const prev = events[index - 1];
+		const curr = events[index];
+		if (prev.getSender() !== curr.getSender()) return true;
+		const timeDiff = curr.getTs() - prev.getTs();
+		return timeDiff > 5 * 60 * 1000;
+	}
+
+	// Group messages by date for date separators
+	function getDateLabel(ts: number): string {
+		const d = new Date(ts);
+		const today = new Date();
+		const yesterday = new Date(today);
+		yesterday.setDate(yesterday.getDate() - 1);
+
+		if (d.toDateString() === today.toDateString()) return 'Today';
+		if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+		return d.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+	}
+
+	function showDateSeparator(events: MatrixEvent[], index: number): string | null {
+		if (index === 0) return getDateLabel(events[0].getTs());
+		const prev = new Date(events[index - 1].getTs()).toDateString();
+		const curr = new Date(events[index].getTs()).toDateString();
+		if (prev !== curr) return getDateLabel(events[index].getTs());
+		return null;
+	}
+</script>
+
+<div class="flex flex-1 min-w-0 overflow-hidden">
+	<!-- Main chat area -->
+	<div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+		<!-- Room header -->
+		<div class="h-12 px-4 flex items-center gap-3 border-b border-discord-divider shadow-sm flex-shrink-0">
+			<svg class="w-6 h-6 text-discord-textMuted flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+				<path d="M5.88 2.39a1 1 0 1 0-1.94.49l.64 2.51A.85.85 0 0 1 3.72 6.5H2a1 1 0 0 0 0 2h1.27l-.63 2.47a1 1 0 1 0 1.94.49L5.5 8.5H9l-.63 2.47a1 1 0 1 0 1.94.49L11.24 8.5H13a1 1 0 0 0 0-2h-1.27l.7-2.73a1 1 0 0 0-1.94-.49L9.58 6.5H6.5l-.62-2.11z"/>
+			</svg>
+			<h2 class="font-semibold text-discord-textPrimary">{roomName}</h2>
+			{#if topic}
+				<div class="w-px h-5 bg-discord-divider"></div>
+				<p class="text-sm text-discord-textMuted truncate flex-1">{topic}</p>
+			{/if}
+			<!-- Toggle member list -->
+			<button
+				onclick={() => showMemberListLocal = !showMemberListLocal}
+				class="ml-auto p-1.5 rounded text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors"
+				title="Toggle member list"
+			>
+				<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+					<path d="M14 6.5a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM1 14.25C1 12.455 2.455 11 4.25 11h7.5C13.545 11 15 12.455 15 14.25v.25a.75.75 0 0 1-.75.75H1.75A.75.75 0 0 1 1 14.5v-.25Zm17.25-5.75a.75.75 0 0 1 .75.75v2h2a.75.75 0 0 1 0 1.5h-2v2a.75.75 0 0 1-1.5 0v-2h-2a.75.75 0 0 1 0-1.5h2v-2a.75.75 0 0 1 .75-.75Z"/>
+				</svg>
+			</button>
+		</div>
+
+		<!-- Messages scrollable area -->
+		<div
+			bind:this={scrollEl}
+			onscroll={onScroll}
+			class="flex-1 overflow-y-auto py-4"
+		>
+			<!-- Load more indicator -->
+			{#if loadingOlder}
+				<div class="flex justify-center py-4">
+					<div class="w-6 h-6 border-2 border-discord-accent border-t-transparent rounded-full animate-spin"></div>
+				</div>
+			{/if}
+
+			<!-- Welcome message at the top -->
+			{#if messages.length === 0}
+				<div class="px-4 pb-4">
+					<div class="w-16 h-16 rounded-full bg-discord-accent flex items-center justify-center mb-4">
+						<svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+							<path d="M5.88 2.39a1 1 0 1 0-1.94.49l.64 2.51A.85.85 0 0 1 3.72 6.5H2a1 1 0 0 0 0 2h1.27l-.63 2.47a1 1 0 1 0 1.94.49L5.5 8.5H9l-.63 2.47a1 1 0 1 0 1.94.49L11.24 8.5H13a1 1 0 0 0 0-2h-1.27l.7-2.73a1 1 0 0 0-1.94-.49L9.58 6.5H6.5l-.62-2.11z"/>
+						</svg>
+					</div>
+					<h3 class="text-2xl font-bold text-discord-textPrimary mb-1">Welcome to #{roomName}!</h3>
+					<p class="text-discord-textMuted">This is the beginning of the #{roomName} room.</p>
+				</div>
+			{/if}
+
+			<!-- Message list -->
+			{#each messages as event, i (event.getId())}
+				{@const dateLabel = showDateSeparator(messages, i)}
+				{#if dateLabel}
+					<div class="flex items-center gap-4 px-4 my-4">
+						<div class="flex-1 h-px bg-discord-divider"></div>
+						<span class="text-xs font-semibold text-discord-textMuted">{dateLabel}</span>
+						<div class="flex-1 h-px bg-discord-divider"></div>
+					</div>
+				{/if}
+				<MessageItem
+					{event}
+					{room}
+					showHeader={shouldShowHeader(messages, i)}
+					onReply={(e) => { replyToEvent = e; }}
+					editRequested={editRequestedEventId === event.getId()}
+					onEditDone={() => messageInputEl?.focus()}
+				/>
+			{/each}
+		</div>
+
+		<!-- Scroll to bottom button -->
+		{#if !isAtBottom && messages.length > 0}
+			<div class="absolute bottom-20 right-72 z-10">
+				<button
+					onclick={() => scrollToBottom(false)}
+					class="bg-discord-backgroundSecondary hover:bg-discord-messageHover text-discord-textPrimary px-3 py-1.5 rounded-full shadow-lg text-sm font-medium border border-discord-divider transition-colors flex items-center gap-1.5"
+				>
+					<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+						<path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+					</svg>
+					Jump to present
+				</button>
+			</div>
+		{/if}
+
+		<!-- Message input -->
+		<MessageInput
+			bind:this={messageInputEl}
+			roomId={roomId}
+			roomName={roomName}
+			{room}
+			{replyToEvent}
+			onCancelReply={() => { replyToEvent = null; }}
+			onRequestEditLast={requestEditLastMessage}
+		/>
+	</div>
+
+	<!-- Debug panel (Ctrl+Shift+D to toggle) -->
+	<DebugPanel {room} />
+
+	<!-- Member list sidebar -->
+	{#if showMemberListLocal}
+		<MemberList {room} />
+	{/if}
+</div>
