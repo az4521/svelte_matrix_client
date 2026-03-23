@@ -13,6 +13,13 @@
 	let preview = $state<UrlPreview | null>(null);
 	let imageError = $state(false);
 	let lightboxOpen = $state(false);
+
+	type DirectEmbed =
+		| { type: 'youtube'; embedUrl: string }
+		| { type: 'video'; videoUrl: string };
+
+	let directEmbed = $state<DirectEmbed | null>(null);
+
 	// Reactively track favourite state — isFavouriteGif reads favouritesState.gifs ($state) so this auto-tracks
 	const favourited = $derived(isFavouriteGif(url));
 
@@ -25,10 +32,77 @@
 		}
 	}
 
+	function getYoutubeEmbedUrl(rawUrl: string): string | null {
+		try {
+			const u = new URL(rawUrl);
+			const h = u.hostname.replace(/^www\./, '');
+			if (h === 'youtube.com' || h === 'm.youtube.com') {
+				const id = u.searchParams.get('v');
+				if (id) return `https://www.youtube.com/embed/${id}`;
+			}
+			if (h === 'youtu.be') {
+				const id = u.pathname.slice(1).split('?')[0];
+				if (id) return `https://www.youtube.com/embed/${id}`;
+			}
+		} catch { /* */ }
+		return null;
+	}
+
+	function getFixUrl(rawUrl: string): string | null {
+		try {
+			const u = new URL(rawUrl);
+			const h = u.hostname.replace(/^www\./, '');
+			if (h === 'x.com' || h === 'twitter.com') { u.hostname = 'fixupx.com'; return u.toString(); }
+			if (h === 'instagram.com' || h === 'kkinstagram.com') { u.hostname = 'vxinstagram.com'; return u.toString(); }
+		} catch { /* */ }
+		return null;
+	}
+
+	async function fetchOgTags(fetchUrl: string): Promise<Record<string, string>> {
+		const res = await fetch(fetchUrl);
+		const html = await res.text();
+		const tags: Record<string, string> = {};
+		for (const match of html.matchAll(/<meta[^>]+>/gi)) {
+			const tag = match[0];
+			const prop = tag.match(/property="og:([^"]+)"/i)?.[1];
+			const content = tag.match(/content="([^"]*)"/i)?.[1];
+			if (prop && content !== undefined) tags[prop] = content;
+		}
+		return tags;
+	}
+
 	$effect(() => {
 		const currentUrl = url;
 		preview = null;
 		imageError = false;
+		directEmbed = null;
+
+		const ytUrl = getYoutubeEmbedUrl(currentUrl);
+		if (ytUrl) {
+			directEmbed = { type: 'youtube', embedUrl: ytUrl };
+			return;
+		}
+
+		const fixUrl = getFixUrl(currentUrl);
+		if (fixUrl) {
+			fetchOgTags(fixUrl).then(tags => {
+				const videoUrl = tags['video:secure_url'] || tags['video:url'] || tags['video'];
+				if (videoUrl) {
+					directEmbed = { type: 'video', videoUrl };
+				} else {
+					// Image-only post — fall back to homeserver preview using the fix URL
+					getUrlPreview(fixUrl).then(data => {
+						if (data && (data.title || data.imageUrl || data.videoUrl)) preview = data;
+					});
+				}
+			}).catch(() => {
+				getUrlPreview(fixUrl).then(data => {
+					if (data && (data.title || data.imageUrl || data.videoUrl)) preview = data;
+				});
+			});
+			return;
+		}
+
 		getUrlPreview(currentUrl).then((data) => {
 			if (data && (data.title || data.imageUrl || data.videoUrl)) {
 				preview = data;
@@ -49,18 +123,25 @@
 	});
 
 	const showInline = $derived(isDirect || (isTenor && !!(preview?.videoUrl || preview?.imageUrl)));
-
-
-	// Decide layout for card previews: tall image goes on the right, wide image below
-	const imageOnRight = $derived.by(() => {
-		if (!preview?.imageUrl || !preview.title) return false;
-		const w = preview.imageWidth ?? 0;
-		const h = preview.imageHeight ?? 0;
-		return h > w || (w === 0 && h === 0);
-	});
 </script>
 
-{#if preview}
+{#if directEmbed?.type === 'youtube'}
+	<iframe
+		src={directEmbed.embedUrl}
+		class="mt-1 w-full max-w-sm aspect-video rounded-lg"
+		allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+		allowfullscreen
+		title="YouTube video"
+	></iframe>
+{:else if directEmbed?.type === 'video'}
+	<!-- svelte-ignore a11y_media_has_caption -->
+	<video
+		src={directEmbed.videoUrl}
+		class="max-w-sm max-h-72 rounded-lg mt-1 block"
+		controls
+		preload="metadata"
+	></video>
+{:else if preview}
 	{#if showInline && preview.videoUrl}
 		<!-- Direct video embed -->
 		<div class="relative inline-block group/media mt-1">
@@ -129,7 +210,7 @@
 			<!-- Left accent bar -->
 			<div class="w-1 flex-shrink-0 bg-discord-accent"></div>
 
-			<div class="flex flex-1 min-w-0 {imageOnRight ? 'flex-row' : 'flex-col'} p-3 gap-3">
+			<div class="flex flex-1 min-w-0 flex-col p-3 gap-3">
 				<!-- Text content -->
 				<div class="flex-1 min-w-0">
 					{#if preview.siteName}
@@ -149,9 +230,7 @@
 						src={mediaStore.resolve(preview.imageUrl)}
 						alt={preview.title ?? ''}
 						onerror={() => (imageError = true)}
-						class={imageOnRight
-							? 'w-20 h-20 flex-shrink-0 rounded object-cover self-center'
-							: 'w-full max-h-52 rounded object-cover mt-1'}
+						class="max-w-full max-h-72 rounded mt-1 object-contain"
 						loading="lazy"
 					/>
 				{/if}
@@ -159,4 +238,3 @@
 		</a>
 	{/if}
 {/if}
-
