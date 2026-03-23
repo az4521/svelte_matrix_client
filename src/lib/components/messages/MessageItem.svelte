@@ -246,7 +246,7 @@
 			.replace(/\son\w+="[^"]*"/g, '')
 			// Convert mxc:// src attributes to HTTP URLs so browsers can load them
 			.replace(/src="(mxc:\/\/[^"]+)"/g, (_match, mxc) => {
-				const http = mxcToHttp(mxc, 128);
+				const http = mediaStore.resolve(mxcToHttp(mxc, 128));
 				return http ? `src="${http}"` : `src=""`;
 			});
 	}
