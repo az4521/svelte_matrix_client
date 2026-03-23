@@ -456,12 +456,13 @@
 		</button>
 	</div>
 	<div class="relative mt-1 px-1 h-4">
+		{#if typingUsers.length === 0}
 		<p class="text-xs text-discord-textMuted">
 			<kbd class="font-mono">Enter</kbd> to send &middot;
 			<kbd class="font-mono">Shift+Enter</kbd> for new line
 			{#if replyToEvent}&middot; <kbd class="font-mono">Esc</kbd> to cancel reply{/if}
 		</p>
-		{#if typingUsers.length > 0}
+		{:else}
 			<p class="absolute inset-0 text-xs text-discord-textMuted bg-discord-backgroundPrimary/90">{typingText()}</p>
 		{/if}
 	</div>
