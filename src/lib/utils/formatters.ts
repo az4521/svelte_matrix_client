@@ -1,4 +1,5 @@
 import { formatDistanceToNow, format } from 'date-fns';
+import { AVATAR_PALETTE } from '$lib/utils/colors';
 
 export function formatTime(timestamp: number): string {
   return format(new Date(timestamp), 'p');
@@ -46,23 +47,12 @@ export function formatRoomName(roomId: string, roomName?: string): string {
 
 export function getRoomIcon(roomId: string): string {
   // Return a color based on room ID for consistent icons
-  const colors = [
-    '#ED4245',
-    '#FAA61A',
-    '#3BA55C',
-    '#5865F2',
-    '#EB459E',
-    '#FEE75C',
-    '#00B0F0',
-    '#9475F5',
-  ];
-
   let hash = 0;
   for (let i = 0; i < roomId.length; i++) {
     hash = roomId.charCodeAt(i) + ((hash << 5) - hash);
   }
 
-  return colors[Math.abs(hash) % colors.length];
+  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
 }
 
 export function getInitials(name: string): string {

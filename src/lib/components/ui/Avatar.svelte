@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { mediaStore } from '$lib/stores/media.svelte';
+	import { AVATAR_PALETTE } from '$lib/utils/colors';
 
 	interface Props {
 		src?: string | null;
@@ -21,21 +22,11 @@
 
 	// Deterministic color from name
 	const bgColor = $derived(() => {
-		const colors = [
-			'#5865F2',
-			'#3BA55C',
-			'#ED4245',
-			'#FAA61A',
-			'#EB459E',
-			'#00B0F0',
-			'#9475F5',
-			'#23A559'
-		];
 		let hash = 0;
 		for (let i = 0; i < name.length; i++) {
 			hash = name.charCodeAt(i) + ((hash << 5) - hash);
 		}
-		return colors[Math.abs(hash) % colors.length];
+		return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
 	});
 
 	const roundedClass = $derived(() => {

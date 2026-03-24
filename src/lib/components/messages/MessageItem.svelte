@@ -375,7 +375,7 @@
 							class="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/50 text-white opacity-0 group-hover/img:opacity-100 transition-opacity hover:bg-black/70"
 						>
 							{#if imageIsFavourited}
-								<svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 24 24">
+								<svg class="w-4 h-4 text-discord-warning" fill="currentColor" viewBox="0 0 24 24">
 									<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
 								</svg>
 							{:else}
@@ -491,7 +491,7 @@
 					bind:this={deleteYesEl}
 					onclick={() => resolveDelete(true)}
 					onkeydown={onDeleteKeydown}
-					class="px-2 py-1 rounded text-xs font-semibold text-white bg-red-600 hover:bg-red-500 transition-colors focus:outline-none focus:ring-2 focus:ring-red-400"
+					class="px-2 py-1 rounded text-xs font-semibold text-white bg-discord-danger hover:bg-discord-dangerHover transition-colors focus:outline-none focus:ring-2 focus:ring-discord-danger"
 				>Yes</button>
 				<button
 					bind:this={deleteNoEl}
@@ -502,7 +502,7 @@
 			{:else}
 				<button
 					onclick={() => confirmingDelete = true}
-					class="p-1.5 rounded text-discord-textMuted hover:text-red-400 hover:bg-discord-messageHover transition-colors"
+					class="p-1.5 rounded text-discord-textMuted hover:text-discord-danger hover:bg-discord-messageHover transition-colors"
 					title="Delete message"
 				>
 					<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -557,7 +557,7 @@
 <style>
 	/* Spoiler tags */
 	:global([data-mx-spoiler]) {
-		background-color: #2a2a2a;
+		background-color: var(--discord-spoiler-bg);
 		color: transparent;
 		border-radius: 3px;
 		padding: 0 3px;
@@ -566,7 +566,7 @@
 		transition: color 0.15s, background-color 0.15s;
 	}
 	:global([data-mx-spoiler].revealed) {
-		background-color: rgba(255, 255, 255, 0.1);
+		background-color: var(--discord-spoiler-revealed-bg);
 		color: inherit;
 		user-select: text;
 	}

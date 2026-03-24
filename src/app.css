@@ -3,20 +3,75 @@
 @tailwind utilities;
 
 :root {
-  --discord-bg: #36393f;
-  --discord-bg-secondary: #2f3136;
-  --discord-bg-tertiary: #202225;
-  --discord-bg-dark: #202226;
-  --discord-text-primary: #dcddde;
-  --discord-text-secondary: #72767d;
-  --discord-text-muted: #4f545c;
-  --discord-accent: #5865F2;
-  --discord-accent-hover: #4752C4;
-  --discord-divider: #41444e;
-  --discord-online: #3BA55C;
-  --discord-idle: #FAA61A;
-  --discord-dnd: #ED4245;
-  --discord-offline: #747f8d;
+  /* ── Brand (blurple) scale ───────────────────────── */
+  --brand-100: #f8f9fd;
+  --brand-130: #f2f4fc;
+  --brand-160: #ebeefa;
+  --brand-200: #e3e7f8;
+  --brand-230: #dae0f5;
+  --brand-260: #d1d9f3;
+  --brand-300: #c7d0f0;
+  --brand-330: #b5c1ec;
+  --brand-360: #a5b3e7;
+  --brand-400: #8ea1e1;
+  --brand-430: #869adf;
+  --brand-460: #7d92dd;
+  --brand-500: #7289da;
+  --brand-530: #687dc6;
+  --brand-560: #5c6fb1;
+  --brand-600: #4e5d94;
+  --brand-630: #435180;
+  --brand-660: #3b4770;
+  --brand-700: #2e3757;
+  --brand-730: #2b3352;
+  --brand-760: #272f4b;
+  --brand-800: #222941;
+  --brand-830: #1a2032;
+  --brand-860: #111521;
+  --brand-900: #06070b;
+
+  /* ── Backgrounds ─────────────────────────────────── */
+  --discord-bg:                  #36393f;
+  --discord-bg-secondary:        #2f3136;
+  --discord-bg-tertiary:         #202225;
+  --discord-bg-dark:             #202226;
+  --discord-bg-hover:            #32353b;
+  --discord-bg-selected:         #282b30;
+
+  /* ── Text ────────────────────────────────────────── */
+  --discord-text-primary:        #dcddde;
+  --discord-text-secondary:      #72767d;
+  --discord-text-muted:          #4f545c;
+
+  /* ── Semantic accents ────────────────────────────── */
+  --discord-accent:              var(--brand-500);
+  --discord-accent-hover:        var(--brand-530);
+  --discord-divider:             #41444e;
+
+  /* ── Status / role colours ───────────────────────── */
+  --discord-online:              #3ba55c;
+  --discord-idle:                #faa61a;
+  --discord-dnd:                 #ed4245;
+  --discord-offline:             #747f8d;
+  --discord-danger:              #ed4245;
+  --discord-danger-hover:        #c03537;
+  --discord-warning:             #faa61a;
+  --discord-positive:            #23a559;
+  --discord-star:                #faa61a;
+
+  /* ── Spoiler ─────────────────────────────────────── */
+  --discord-spoiler-bg:          #1e1f22;
+  --discord-spoiler-revealed-bg: rgba(255,255,255,0.1);
+
+  /* ── Avatar palette (deterministic bg colours) ───── */
+  --avatar-color-0: var(--brand-500);
+  --avatar-color-1: #3ba55c;
+  --avatar-color-2: #ed4245;
+  --avatar-color-3: #faa61a;
+  --avatar-color-4: #eb459e;
+  --avatar-color-5: #00b0f0;
+  --avatar-color-6: #9475f5;
+  --avatar-color-7: #23a559;
 }
 
 * {

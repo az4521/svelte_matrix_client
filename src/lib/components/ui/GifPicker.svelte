@@ -110,7 +110,7 @@
 						<button
 							onclick={(e) => { e.stopPropagation(); removeFavouriteGif(gif.url); }}
 							title="Remove from favourites"
-							class="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-black/60 text-yellow-400 opacity-0 group-hover/gif:opacity-100 transition-opacity hover:bg-black/80"
+							class="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-black/60 text-discord-warning opacity-0 group-hover/gif:opacity-100 transition-opacity hover:bg-black/80"
 						>
 							<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
 								<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>

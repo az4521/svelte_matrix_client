@@ -153,7 +153,7 @@
 
 		<!-- Joined rooms / channels -->
 		{#if visibleRooms.length > 0}
-			<div class="px-2 mb-2">
+			<div class="mb-2">
 				<p class="px-2 py-1 text-xs font-semibold text-discord-textMuted uppercase tracking-wide">
 					{roomsState.activeSpaceId ? 'Channels' : 'Rooms'}
 				</p>
@@ -162,13 +162,13 @@
 					<button
 						onclick={() => setActiveRoom(room.roomId)}
 						oncontextmenu={(e) => openContextMenu(e, room.roomId)}
-						class="w-full flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-left"
-						class:bg-discord-messageHover={isActive}
+						class="w-full flex items-center gap-2 pr-2 py-1.5 transition-colors text-left"
 						class:text-discord-textPrimary={isActive || unread > 0}
 						class:text-discord-textMuted={!isActive && unread === 0}
 						class:font-semibold={unread > 0}
 						class:hover:bg-discord-messageHover={!isActive}
 						class:hover:text-discord-textPrimary={!isActive}
+						style={isActive ? 'border-left: 3px solid var(--discord-accent); background: linear-gradient(to right, var(--discord-bg-selected) 85%, var(--discord-bg-secondary)); padding-left: calc(0.5rem - 3px);' : 'padding-left: 0.5rem;'}
 					>
 						<span class="w-5 h-5 flex-shrink-0 opacity-70 font-semibold flex items-center justify-center">#</span>
 						<span class="flex-1 text-sm truncate">{getRoomDisplayName(room)}</span>
@@ -184,7 +184,7 @@
 
 		<!-- Unjoined rooms (from space hierarchy) -->
 		{#if unjoinedRooms.length > 0}
-			<div class="px-2 mb-2">
+			<div class="mb-2">
 				<p class="px-2 py-1 text-xs font-semibold text-discord-textMuted uppercase tracking-wide">
 					Browse Channels
 				</p>
@@ -235,12 +235,12 @@
 					<button
 						onclick={() => setActiveRoom(room.roomId)}
 						oncontextmenu={(e) => openContextMenu(e, room.roomId)}
-						class="w-full flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-left"
-						class:bg-discord-messageHover={isActive}
+						class="w-full flex items-center gap-2 pr-2 py-1.5 transition-colors text-left"
 						class:text-discord-textPrimary={isActive || unread > 0}
 						class:text-discord-textMuted={!isActive && unread === 0}
 						class:hover:bg-discord-messageHover={!isActive}
 						class:hover:text-discord-textPrimary={!isActive}
+						style={isActive ? 'border-left: 3px solid var(--discord-accent); background: linear-gradient(to right, var(--discord-bg-selected) 85%, var(--discord-bg-secondary)); padding-left: calc(0.5rem - 3px);' : 'padding-left: 0.5rem;'}
 					>
 						<Avatar src={avatarSrc} name={getRoomDisplayName(room)} size={32} />
 						<span class="flex-1 text-sm truncate">{getRoomDisplayName(room)}</span>
