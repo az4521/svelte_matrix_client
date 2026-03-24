@@ -33,6 +33,6 @@
 		{src}
 		{alt}
 		onclick={(e) => e.stopPropagation()}
-		style="max-width: calc(100dvw - 2em); max-height: calc(100dvh - 2em); object-fit: contain; border-radius: 0.5em;"
+		style="max-width: calc(100dvw - {mobileState.isMobile ? '6em' : '2em'}); max-height: calc(100dvh - {mobileState.isMobile ? '6em' : '2em'}); object-fit: contain; border-radius: 0.5em;"
 	/>
 </div>
