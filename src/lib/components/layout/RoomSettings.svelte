@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Room, RoomMember } from 'matrix-js-sdk';
-	import { untrack } from 'svelte';
+	import { onMount, onDestroy, untrack } from 'svelte';
 	import Avatar from '$lib/components/ui/Avatar.svelte';
 	import {
 		getMyPowerLevel, getRoomPowerLevels, setRoomPowerLevels, setUserPowerLevel,
@@ -14,6 +14,7 @@
 	import { mediaStore } from '$lib/stores/media.svelte';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { roomsState } from '$lib/stores/rooms.svelte';
+	import { mobileState } from '$lib/stores/mobile.svelte';
 
 	interface Props {
 		room: Room;
@@ -260,6 +261,9 @@
 		finally { roomActionPending = null; }
 	}
 
+	onMount(() => { mobileState.settingsOpen = true; });
+	onDestroy(() => { mobileState.settingsOpen = false; });
+
 	const tabs: { id: Tab; label: string }[] = [
 		{ id: 'general', label: 'General' },
 		{ id: 'access', label: 'Access' },
@@ -273,7 +277,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
-	class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+	class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-1 sm:p-4"
 	onclick={(e) => { if (e.target === e.currentTarget) onClose(); }}
 >
 	<div class="bg-discord-backgroundSecondary rounded-xl shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden" style="max-height: 85dvh;">

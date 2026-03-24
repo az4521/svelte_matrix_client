@@ -33,6 +33,7 @@
 	let fileInputEl: HTMLInputElement | undefined = $state();
 	let typingUsers = $state<string[]>([]);
 	let typingStopTimer: ReturnType<typeof setTimeout> | null = null;
+	let lastTypingSentAt = 0;
 
 	// Subscribe to typing events for the current room
 	$effect(() => {
@@ -271,9 +272,16 @@
 		textareaEl.style.height = Math.min(textareaEl.scrollHeight, 200) + 'px';
 
 		if (room) {
-			sendTyping(room.roomId, true);
+			const now = Date.now();
+			if (now - lastTypingSentAt >= 5000) {
+				lastTypingSentAt = now;
+				sendTyping(room.roomId, true);
+			}
 			if (typingStopTimer) clearTimeout(typingStopTimer);
-			typingStopTimer = setTimeout(() => { if (room) sendTyping(room.roomId, false); }, 5000);
+			typingStopTimer = setTimeout(() => {
+				if (room) sendTyping(room.roomId, false);
+				lastTypingSentAt = 0;
+			}, 5000);
 		}
 	}
 

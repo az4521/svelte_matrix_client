@@ -1,16 +1,16 @@
 <script lang="ts">
 	import type { Room } from 'matrix-js-sdk';
 	import Avatar from '$lib/components/ui/Avatar.svelte';
-	import { getRoomAvatar, getRoomDisplayName, getUnreadCount, joinRoom, leaveRoom, acceptInvite, rejectInvite, getInviteSender, getMyPowerLevel, getRoomPowerLevels, getRoom, getRoomsInSpace } from '$lib/matrix/client';
+	import { getRoomAvatar, getRoomDisplayName, getUnreadCount, joinRoom, leaveRoom, acceptInvite, rejectInvite, getInviteSender, getMyPowerLevel, getRoomPowerLevels, getRoom } from '$lib/matrix/client';
 	import { roomsState, setActiveRoom, setActiveSpace } from '$lib/stores/rooms.svelte';
 	import { auth } from '$lib/stores/auth.svelte';
-	import RoomSettings from '$lib/components/layout/RoomSettings.svelte';
 
 	interface Props {
 		onLogout: () => void;
+		onOpenSpaceSettings?: (room: Room) => void;
 	}
 
-	let { onLogout }: Props = $props();
+	let { onLogout, onOpenSpaceSettings }: Props = $props();
 
 	// Rooms currently being joined (show spinner)
 	let joiningIds = $state(new Set<string>());
@@ -58,6 +58,13 @@
 		try {
 			await leaveRoom(roomId);
 			if (roomsState.activeRoomId === roomId) roomsState.activeRoomId = null;
+			roomsState.orphanRooms = roomsState.orphanRooms.filter((r) => r.roomId !== roomId);
+			roomsState.directRooms = roomsState.directRooms.filter((r) => r.roomId !== roomId);
+			roomsState.roomsInSpace = roomsState.roomsInSpace.filter((r) => r.roomId !== roomId);
+			roomsState.spaces = roomsState.spaces.filter((r) => r.roomId !== roomId);
+			roomsState.spaceHierarchy = roomsState.spaceHierarchy.map((r) =>
+				r.roomId === roomId ? { ...r, isJoined: false } : r
+			);
 		} catch (err) {
 			console.error('Failed to leave room:', err);
 		}
@@ -127,8 +134,6 @@
 		}
 	}
 
-	let showSpaceSettings = $state(false);
-
 	const activeSpaceRoom = $derived(
 		roomsState.activeSpaceId ? getRoom(roomsState.activeSpaceId) : null
 	);
@@ -157,7 +162,7 @@
 		{/if}
 		{#if canAccessSpaceSettings}
 			<button
-				onclick={() => showSpaceSettings = true}
+				onclick={() => activeSpaceRoom && onOpenSpaceSettings?.(activeSpaceRoom)}
 				class="p-1 rounded text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors flex-shrink-0"
 				title="Space settings"
 			>
@@ -343,9 +348,6 @@
 	</div>
 </div>
 
-{#if showSpaceSettings && activeSpaceRoom}
-	<RoomSettings room={activeSpaceRoom} onClose={() => showSpaceSettings = false} onUpdate={() => { if (roomsState.activeSpaceId) roomsState.roomsInSpace = getRoomsInSpace(roomsState.activeSpaceId); }} />
-{/if}
 
 {#if contextMenu}
 	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->

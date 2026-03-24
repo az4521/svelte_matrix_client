@@ -171,8 +171,12 @@ export function stopClient(): void {
 	matrixClient = null;
 }
 
+const pendingLeaves = new Set<string>();
+
 export function getRooms(): Room[] {
-	return matrixClient?.getRooms() ?? [];
+	return (matrixClient?.getRooms() ?? []).filter(
+		(r) => r.getMyMembership() === 'join' && !pendingLeaves.has(r.roomId)
+	);
 }
 
 export function getRoom(roomId: string): Room | null {
@@ -213,7 +217,7 @@ export function getRoomsInSpace(spaceId: string): Room[] {
 	const childIds = getSpaceChildIds(spaceId);
 	return childIds
 		.map((id) => matrixClient?.getRoom(id))
-		.filter((r): r is Room => !!r && !r.isSpaceRoom());
+		.filter((r): r is Room => !!r && !r.isSpaceRoom() && r.getMyMembership() === 'join' && !pendingLeaves.has(r.roomId));
 }
 
 export function getDirectRoomIds(): Set<string> {
@@ -480,13 +484,14 @@ export async function sendEdit(roomId: string, eventId: string, newText: string,
 
 export function onRoomUpdate(callback: () => void): () => void {
 	if (!matrixClient) return () => {};
-	matrixClient.on('Room' as never, callback as never);
-	matrixClient.on('Room.name' as never, callback as never);
-	matrixClient.on(RoomMemberEvent.Membership as never, callback as never);
+	const syncHandler = (state: string) => {
+		if (state === 'PREPARED' || state === 'SYNCING') callback();
+	};
+	matrixClient.on(ClientEvent.Sync, syncHandler as never);
+	matrixClient.on('Room.myMembership' as never, callback as never);
 	return () => {
-		matrixClient?.off('Room' as never, callback as never);
-		matrixClient?.off('Room.name' as never, callback as never);
-		matrixClient?.off(RoomMemberEvent.Membership as never, callback as never);
+		matrixClient?.off(ClientEvent.Sync, syncHandler as never);
+		matrixClient?.off('Room.myMembership' as never, callback as never);
 	};
 }
 
@@ -634,7 +639,22 @@ export async function setSpaceOrder(order: string[]): Promise<void> {
 
 export async function leaveRoom(roomId: string): Promise<void> {
 	if (!matrixClient) throw new Error('Not logged in');
-	await matrixClient.leave(roomId);
+	pendingLeaves.add(roomId);
+	try {
+		await matrixClient.leave(roomId);
+	} catch (e) {
+		pendingLeaves.delete(roomId);
+		throw e;
+	}
+	// Remove from pendingLeaves once the SDK reflects the leave locally
+	const check = setInterval(() => {
+		const room = matrixClient?.getRoom(roomId);
+		if (!room || room.getMyMembership() !== 'join') {
+			pendingLeaves.delete(roomId);
+			clearInterval(check);
+		}
+	}, 500);
+	setTimeout(() => { pendingLeaves.delete(roomId); clearInterval(check); }, 30000);
 }
 
 export async function joinRoom(roomId: string, via?: string[]): Promise<void> {

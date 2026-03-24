@@ -5,6 +5,7 @@
 	import SpaceSidebar from '$lib/components/layout/SpaceSidebar.svelte';
 	import RoomList from '$lib/components/layout/RoomList.svelte';
 	import MessageArea from '$lib/components/layout/MessageArea.svelte';
+	import RoomSettings from '$lib/components/layout/RoomSettings.svelte';
 
 	import { auth, clearSession } from '$lib/stores/auth.svelte';
 	import { roomsState, setActiveSpace } from '$lib/stores/rooms.svelte';
@@ -23,8 +24,10 @@
 		onRoomUpdate,
 		onAccountData
 	} from '$lib/matrix/client';
+	import type { Room } from 'matrix-js-sdk';
 
 	let showSettings = $state(false);
+	let spaceSettingsRoom = $state<Room | null>(null);
 
 	// Animated drawer drag (mobile)
 	const DRAWER_WIDTH = 312; // 72px SpaceSidebar + 240px RoomList
@@ -92,7 +95,7 @@
 	}
 
 	function drawerDragStart(e: TouchEvent) {
-		if (!mobileState.isMobile || isDragging || dragPending || mobileState.rightOpen || mobileState.lightboxOpen) return;
+		if (!mobileState.isMobile || isDragging || dragPending || mobileState.rightOpen || mobileState.lightboxOpen || mobileState.settingsOpen) return;
 		dragStartX = e.touches[0].clientX;
 		dragStartY = e.touches[0].clientY;
 		dragBaseTranslate = mobileState.leftOpen ? 0 : -DRAWER_WIDTH;
@@ -109,24 +112,31 @@
 		}
 	});
 
+	let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+	function scheduleRefreshRooms() {
+		if (refreshTimer) return;
+		refreshTimer = setTimeout(() => { refreshTimer = null; refreshRooms(); }, 50);
+	}
+
 	function refreshRooms() {
 		const layout = getSpaceLayout();
 		roomsState.spaceLayout = layout;
 		const spaces = getSpaces();
 		if (layout.order.length) {
 			// Build a flat ordered list of all space IDs (including those inside folders)
-			const allIds: string[] = [];
+			const idIndex = new Map<string, number>();
+			let idx = 0;
 			for (const id of layout.order) {
 				if (layout.folders[id]) {
-					allIds.push(...layout.folders[id].spaceIds);
+					for (const sid of layout.folders[id].spaceIds) idIndex.set(sid, idx++);
 				} else {
-					allIds.push(id);
+					idIndex.set(id, idx++);
 				}
 			}
 			spaces.sort((a, b) => {
-				const ai = allIds.indexOf(a.roomId);
-				const bi = allIds.indexOf(b.roomId);
-				return (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi);
+				const ai = idIndex.get(a.roomId) ?? Infinity;
+				const bi = idIndex.get(b.roomId) ?? Infinity;
+				return ai - bi;
 			});
 		}
 		roomsState.spaces = spaces;
@@ -155,7 +165,7 @@
 		};
 		mq.addEventListener('change', onMqChange);
 
-		const unsubRooms = onRoomUpdate(() => refreshRooms());
+		const unsubRooms = onRoomUpdate(() => scheduleRefreshRooms());
 		const unsubFavourites = initFavourites();
 		const unsubAccountData = onAccountData((type) => {
 			if (type === 'im.client.space_layout' || type === 'im.client.space_order') refreshRooms();
@@ -237,7 +247,7 @@
 		{#if !mobileState.isMobile}
 			<!-- Desktop: permanent sidebars -->
 			<SpaceSidebar onHomeClick={() => setActiveSpace(null)} onSettingsClick={() => showSettings = !showSettings} />
-			<RoomList onLogout={handleLogout} />
+			<RoomList onLogout={handleLogout} onOpenSpaceSettings={(r) => spaceSettingsRoom = r} />
 		{:else}
 			<!-- Mobile: animated drawer + backdrop -->
 			<!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -255,7 +265,7 @@
 					onHomeClick={() => { setActiveSpace(null); mobileState.leftOpen = false; }}
 					onSettingsClick={() => { showSettings = !showSettings; mobileState.leftOpen = false; }}
 				/>
-				<RoomList onLogout={handleLogout} />
+				<RoomList onLogout={handleLogout} onOpenSpaceSettings={(r) => spaceSettingsRoom = r} />
 			</div>
 		{/if}
 
@@ -328,4 +338,12 @@
 			</div>
 		{/if}
 	</div>
+{/if}
+
+{#if spaceSettingsRoom}
+	<RoomSettings
+		room={spaceSettingsRoom}
+		onClose={() => spaceSettingsRoom = null}
+		onUpdate={() => { if (roomsState.activeSpaceId) roomsState.roomsInSpace = getRoomsInSpace(roomsState.activeSpaceId); }}
+	/>
 {/if}

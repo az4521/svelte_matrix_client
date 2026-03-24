@@ -4,4 +4,5 @@ export const mobileState = $state({
 	rightOpen: false,
 	selectedMessageId: null as string | null,
 	lightboxOpen: false,
+	settingsOpen: false,
 });
