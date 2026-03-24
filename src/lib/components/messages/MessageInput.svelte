@@ -337,7 +337,7 @@
 		</div>
 	{/if}
 	<div
-		class="flex items-center gap-2 bg-discord-backgroundSecondary rounded-lg px-2.5 py-2.5 border border-transparent focus-within:border-discord-accent/30 transition-colors"
+		class="input-box flex items-center gap-2 bg-discord-backgroundSecondary rounded-lg px-2.5 py-2.5 border border-transparent transition-colors"
 		class:rounded-tl-none={!!replyToEvent}
 	>
 		<!-- Attach file button -->
@@ -476,3 +476,10 @@
 		{/if}
 	</div>
 </div>
+
+<style>
+	.input-box:focus-within {
+		outline: none;
+		border-color: rgb(var(--discord-accent-rgb) / 0.3);
+	}
+</style>

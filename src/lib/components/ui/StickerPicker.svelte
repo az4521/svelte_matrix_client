@@ -187,7 +187,7 @@
 			bind:value={search}
 			placeholder="Search stickers…"
 			onkeydown={onSearchKeydown}
-			class="w-full bg-discord-backgroundTertiary text-discord-textPrimary placeholder-discord-textMuted text-sm rounded-lg px-3 py-1.5 outline-none focus:ring-1 focus:ring-discord-accent/50"
+			class="search-input w-full bg-discord-backgroundTertiary text-discord-textPrimary placeholder-discord-textMuted text-sm rounded-lg px-3 py-1.5 outline-none border border-transparent"
 		/>
 	</div>
 
@@ -278,3 +278,10 @@
 		</div>
 	{/if}
 </div>
+
+<style>
+	.search-input:focus {
+		outline: none;
+		border-color: rgb(var(--discord-accent-rgb) / 0.3);
+	}
+</style>

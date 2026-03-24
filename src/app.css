@@ -30,6 +30,34 @@
   --brand-860: #111521;
   --brand-900: #06070b;
 
+  --brand-rgb: 114 137 218;
+  --brand-100-rgb: 248 249 253;
+  --brand-130-rgb: 242 244 252;
+  --brand-160-rgb: 235 238 250;
+  --brand-200-rgb: 227 231 248;
+  --brand-230-rgb: 218 224 245;
+  --brand-260-rgb: 209 217 243;
+  --brand-300-rgb: 199 208 240;
+  --brand-330-rgb: 181 193 236;
+  --brand-360-rgb: 165 179 231;
+  --brand-400-rgb: 142 161 225;
+  --brand-430-rgb: 134 154 223;
+  --brand-460-rgb: 125 146 221;
+  --brand-500-rgb: 114 137 218;
+  --brand-530-rgb: 104 125 198;
+  --brand-560-rgb: 92 111 177;
+  --brand-600-rgb: 78 93 148;
+  --brand-630-rgb: 67 81 128;
+  --brand-660-rgb: 59 71 112;
+  --brand-700-rgb: 46 55 87;
+  --brand-730-rgb: 43 51 82;
+  --brand-760-rgb: 39 47 75;
+  --brand-800-rgb: 34 41 65;
+  --brand-830-rgb: 26 32 50;
+  --brand-860-rgb: 17 21 33;
+  --brand-900-rgb: 6 7 11;
+
+
   /* ── Backgrounds ─────────────────────────────────── */
   --discord-bg:                  #36393f;
   --discord-bg-secondary:        #2f3136;
@@ -46,6 +74,10 @@
   /* ── Semantic accents ────────────────────────────── */
   --discord-accent:              var(--brand-500);
   --discord-accent-hover:        var(--brand-530);
+  /* RGB channels for opacity modifier support (e.g. bg-discord-accent/30) */
+  --discord-accent-rgb:          var(--brand-500-rgb);
+  --discord-accent-hover-rgb:    var(--brand-530-rgb);
+  --discord-danger-rgb:          237 66 69;
   --discord-divider:             #41444e;
 
   /* ── Status / role colours ───────────────────────── */
