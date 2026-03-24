@@ -60,12 +60,9 @@
 			onclick={() => setActiveSpace(space.roomId)}
 			oncontextmenu={(e) => openContextMenu(e, space.roomId)}
 			class="group relative w-12 h-12 flex items-center justify-center transition-all duration-200 flex-shrink-0"
-			class:rounded-xl={isActive}
-			class:rounded-2xl={!isActive}
-			class:hover:rounded-xl={!isActive}
 			title={space.name || space.roomId}
 		>
-			<Avatar src={avatarSrc} name={space.name || '?'} size={48} rounded="lg" />
+			<Avatar src={avatarSrc} name={space.name || '?'} size={48} rounded="none" class="{isActive ? 'rounded-xl' : 'rounded-2xl group-hover:rounded-xl'} transition-all duration-200" />
 			{#if isActive}
 				<div class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 w-1 h-8 bg-white rounded-r-full"></div>
 			{:else}

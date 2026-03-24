@@ -6,10 +6,11 @@
 		src?: string | null;
 		name?: string;
 		size?: number;
-		rounded?: 'full' | 'lg' | 'md';
+		rounded?: 'full' | 'lg' | 'md' | 'xl' | '2xl' | 'none';
+		class?: string;
 	}
 
-	let { src = null, name = '?', size = 40, rounded = 'full' }: Props = $props();
+	let { src = null, name = '?', size = 40, rounded = 'full', class: extraClass = '' }: Props = $props();
 
 	const resolvedSrc = $derived(mediaStore.resolve(src));
 
@@ -30,14 +31,17 @@
 	});
 
 	const roundedClass = $derived(() => {
+		if (rounded === 'none') return '';
 		if (rounded === 'full') return 'rounded-full';
+		if (rounded === '2xl') return 'rounded-2xl';
+		if (rounded === 'xl') return 'rounded-xl';
 		if (rounded === 'lg') return 'rounded-lg';
 		return 'rounded-md';
 	});
 </script>
 
 <div
-	class="flex-shrink-0 flex items-center justify-center overflow-hidden {roundedClass()}"
+	class="flex-shrink-0 flex items-center justify-center overflow-hidden {roundedClass()} {extraClass}"
 	style="width: {size}px; height: {size}px; background-color: {resolvedSrc ? 'transparent' : bgColor()};"
 >
 	{#if resolvedSrc}
