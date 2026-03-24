@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Avatar from '$lib/components/ui/Avatar.svelte';
-	import { getRoomAvatar } from '$lib/matrix/client';
+	import { getRoomAvatar, leaveRoom } from '$lib/matrix/client';
 	import { roomsState, setActiveSpace } from '$lib/stores/rooms.svelte';
 
 	interface Props {
@@ -9,6 +9,23 @@
 	}
 
 	let { onHomeClick, onSettingsClick }: Props = $props();
+
+	let contextMenu = $state<{ spaceId: string; x: number; y: number } | null>(null);
+
+	function openContextMenu(e: MouseEvent, spaceId: string) {
+		e.preventDefault();
+		contextMenu = { spaceId, x: e.clientX, y: e.clientY };
+	}
+
+	async function handleLeaveSpace(spaceId: string) {
+		contextMenu = null;
+		try {
+			await leaveRoom(spaceId);
+			if (roomsState.activeSpaceId === spaceId) setActiveSpace(null);
+		} catch (err) {
+			console.error('Failed to leave space:', err);
+		}
+	}
 </script>
 
 <nav class="w-[72px] bg-discord-backgroundTertiary flex flex-col items-center py-3 gap-2 overflow-y-auto scrollbar-hide flex-shrink-0">
@@ -41,6 +58,7 @@
 		{@const avatarSrc = getRoomAvatar(space)}
 		<button
 			onclick={() => setActiveSpace(space.roomId)}
+			oncontextmenu={(e) => openContextMenu(e, space.roomId)}
 			class="group relative w-12 h-12 flex items-center justify-center transition-all duration-200 flex-shrink-0"
 			class:rounded-xl={isActive}
 			class:rounded-2xl={!isActive}
@@ -58,6 +76,20 @@
 
 	{#if roomsState.spaces.length > 0}
 		<div class="w-8 h-px bg-discord-divider my-1 flex-shrink-0"></div>
+	{/if}
+
+	{#if contextMenu}
+		<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+		<div class="fixed inset-0 z-50" onclick={() => contextMenu = null}></div>
+		<div
+			class="fixed z-50 bg-discord-backgroundTertiary border border-discord-divider rounded-lg shadow-xl py-1 min-w-36"
+			style="left: {contextMenu.x}px; top: {contextMenu.y}px"
+		>
+			<button
+				onclick={() => handleLeaveSpace(contextMenu!.spaceId)}
+				class="w-full text-left px-3 py-1.5 text-sm text-discord-danger hover:bg-discord-danger hover:text-white transition-colors"
+			>Leave Space</button>
+		</div>
 	{/if}
 
 	<!-- Settings button -->

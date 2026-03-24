@@ -1,4 +1,4 @@
-import { createClient, ClientEvent, RoomEvent, RoomMemberEvent, PendingEventOrdering, EventStatus } from 'matrix-js-sdk';
+import { createClient, ClientEvent, RoomEvent, RoomMemberEvent, PendingEventOrdering, EventStatus, EventTimeline } from 'matrix-js-sdk';
 import type { MatrixClient, Room, MatrixEvent, RoomMember } from 'matrix-js-sdk';
 
 let matrixClient: MatrixClient | null = null;
@@ -149,7 +149,7 @@ export function getSpaceChildIds(spaceId: string): string[] {
 	const space = matrixClient?.getRoom(spaceId);
 	if (!space) return [];
 
-	const events = space.currentState.getStateEvents('m.space.child');
+	const events = space.getLiveTimeline().getState(EventTimeline.FORWARDS)?.getStateEvents('m.space.child');
 	const arr = Array.isArray(events) ? events : events ? [events] : [];
 
 	return arr
@@ -374,12 +374,12 @@ export function getRoomMembers(room: Room): RoomMember[] {
 }
 
 export function getRoomTopic(room: Room): string | null {
-	const topicEvent = room.currentState.getStateEvents('m.room.topic', '');
+	const topicEvent = room.getLiveTimeline().getState(EventTimeline.FORWARDS)?.getStateEvents('m.room.topic', '');
 	return topicEvent?.getContent()?.topic || null;
 }
 
 export function getRoomAvatar(room: Room): string | null {
-	const avatarEvent = room.currentState.getStateEvents('m.room.avatar', '');
+	const avatarEvent = room.getLiveTimeline().getState(EventTimeline.FORWARDS)?.getStateEvents('m.room.avatar', '');
 	const mxc = avatarEvent?.getContent()?.url;
 	return mxcToHttp(mxc);
 }
@@ -490,6 +490,7 @@ export interface SpaceChildInfo {
 	avatarUrl?: string;
 	numMembers: number;
 	isJoined: boolean;
+	via: string[];
 }
 
 export async function fetchSpaceHierarchy(spaceId: string): Promise<SpaceChildInfo[]> {
@@ -504,18 +505,47 @@ export async function fetchSpaceHierarchy(spaceId: string): Promise<SpaceChildIn
 
 		const joinedIds = new Set(matrixClient.getRooms().map((r) => r.roomId));
 
+		// Build a via-servers map from the space entry's children_state
+		const viaMap = new Map<string, string[]>();
+		const spaceEntry = result.rooms.find((r) => r['room_id'] === spaceId);
+		if (spaceEntry) {
+			const childrenState = (spaceEntry['children_state'] as Array<Record<string, unknown>>) ?? [];
+			for (const ev of childrenState) {
+				if (ev['type'] === 'm.space.child') {
+					const childRoomId = ev['state_key'] as string;
+					const via = ((ev['content'] as Record<string, unknown>)?.['via'] as string[]) ?? [];
+					if (childRoomId && via.length) viaMap.set(childRoomId, via);
+				}
+			}
+		}
+
+		// Also fall back to the local room state for via servers
+		const spaceRoom = matrixClient.getRoom(spaceId);
+		if (spaceRoom) {
+			const childEvents = spaceRoom.getLiveTimeline().getState(EventTimeline.FORWARDS)?.getStateEvents('m.space.child') ?? [];
+			for (const ev of childEvents) {
+				const childRoomId = ev.getStateKey();
+				const via = (ev.getContent()['via'] as string[]) ?? [];
+				if (childRoomId && via.length && !viaMap.has(childRoomId)) {
+					viaMap.set(childRoomId, via);
+				}
+			}
+		}
+
 		return result.rooms
 			.filter((r) => r['room_id'] !== spaceId)
 			.filter((r) => r['room_type'] !== 'm.space')
 			.map((r) => {
 				const mxcAvatar = r['avatar_url'] as string | undefined;
+				const roomId = r['room_id'] as string;
 				return {
-					roomId: r['room_id'] as string,
-					name: (r['name'] as string) || (r['room_id'] as string),
+					roomId,
+					name: (r['name'] as string) || roomId,
 					topic: r['topic'] as string | undefined,
 					avatarUrl: mxcAvatar ? mxcToHttp(mxcAvatar) ?? undefined : undefined,
 					numMembers: (r['num_joined_members'] as number) ?? 0,
-					isJoined: joinedIds.has(r['room_id'] as string)
+					isJoined: joinedIds.has(roomId),
+					via: viaMap.get(roomId) ?? []
 				};
 			});
 	} catch (err) {
@@ -524,9 +554,36 @@ export async function fetchSpaceHierarchy(spaceId: string): Promise<SpaceChildIn
 	}
 }
 
-export async function joinRoom(roomId: string): Promise<void> {
+export async function leaveRoom(roomId: string): Promise<void> {
+	if (!matrixClient) throw new Error('Not logged in');
+	await matrixClient.leave(roomId);
+}
+
+export async function joinRoom(roomId: string, via?: string[]): Promise<void> {
+	if (!matrixClient) throw new Error('Not logged in');
+	await matrixClient.joinRoom(roomId, via?.length ? { viaServers: via } : undefined);
+}
+
+export function getInvitedRooms(): Room[] {
+	if (!matrixClient) return [];
+	return matrixClient.getRooms().filter((r) => r.getMyMembership() === 'invite');
+}
+
+export async function acceptInvite(roomId: string): Promise<void> {
 	if (!matrixClient) throw new Error('Not logged in');
 	await matrixClient.joinRoom(roomId);
+}
+
+export async function rejectInvite(roomId: string): Promise<void> {
+	if (!matrixClient) throw new Error('Not logged in');
+	await matrixClient.leave(roomId);
+}
+
+export function getInviteSender(room: Room): string | null {
+	const me = matrixClient?.getUserId();
+	if (!me) return null;
+	const member = room.getMember(me);
+	return member?.events.member?.getSender() ?? null;
 }
 
 export interface ReactionGroup {
@@ -629,7 +686,7 @@ function matchesUsage(imageUsage: string[] | undefined, packUsage: string[] | un
 
 function extractRoomImages(room: Room, kind: ImageUsage): CustomEmoji[] {
 	try {
-		const events = room.currentState.getStateEvents('im.ponies.room_emotes');
+		const events = room.getLiveTimeline().getState(EventTimeline.FORWARDS)?.getStateEvents('im.ponies.room_emotes') ?? [];
 		const seen = new Set<string>();
 		return events.flatMap((event) => {
 			const content = event.getContent();

@@ -14,6 +14,7 @@
 		getOrphanRooms,
 		getDirectRooms,
 		getRoomsInSpace,
+		getInvitedRooms,
 		fetchSpaceHierarchy,
 		getRoom,
 		logout,
@@ -33,9 +34,11 @@
 		roomsState.spaces = getSpaces();
 		roomsState.orphanRooms = getOrphanRooms();
 		roomsState.directRooms = getDirectRooms();
+		roomsState.invitedRooms = getInvitedRooms();
 		if (roomsState.activeSpaceId) {
 			roomsState.roomsInSpace = getRoomsInSpace(roomsState.activeSpaceId);
 		}
+		roomsState.roomsTick++;
 	}
 
 	onMount(() => {
@@ -80,9 +83,10 @@
 
 	// Derive directly from activeRoomId (a stable string) rather than the room arrays,
 	// so sync-triggered array refreshes don't invalidate this derived and remount MessageArea.
-	const activeRoom = $derived(
-		roomsState.activeRoomId ? getRoom(roomsState.activeRoomId) : null
-	);
+	const activeRoom = $derived.by(() => {
+		void roomsState.roomsTick; // re-derive when rooms refresh (e.g. after joining)
+		return roomsState.activeRoomId ? getRoom(roomsState.activeRoomId) : null;
+	});
 </script>
 
 <svelte:head>

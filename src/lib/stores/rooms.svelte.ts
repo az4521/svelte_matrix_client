@@ -39,13 +39,15 @@ export const roomsState = $state({
 	spaces: [] as Room[],
 	orphanRooms: [] as Room[],
 	directRooms: [] as Room[],
+	invitedRooms: [] as Room[],
 	activeSpaceId: loadLastSpace() as string | null,
 	activeRoomId: getLastRoom(loadLastSpace()) as string | null,
 	roomsInSpace: [] as Room[],
 	spaceHierarchy: [] as SpaceChildInfo[],
 	hierarchyLoading: false,
 	isLoading: false,
-	unreadTick: 0
+	unreadTick: 0,
+	roomsTick: 0
 });
 
 export function bumpUnreadTick(): void {

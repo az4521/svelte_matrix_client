@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Room } from 'matrix-js-sdk';
 	import Avatar from '$lib/components/ui/Avatar.svelte';
-	import { getRoomAvatar, getRoomDisplayName, getUnreadCount, joinRoom } from '$lib/matrix/client';
+	import { getRoomAvatar, getRoomDisplayName, getUnreadCount, joinRoom, leaveRoom, acceptInvite, rejectInvite, getInviteSender } from '$lib/matrix/client';
 	import { roomsState, setActiveRoom, setActiveSpace } from '$lib/stores/rooms.svelte';
 	import { auth } from '$lib/stores/auth.svelte';
 
@@ -13,6 +13,25 @@
 
 	// Rooms currently being joined (show spinner)
 	let joiningIds = $state(new Set<string>());
+	let inviteActionIds = $state(new Set<string>());
+
+	// Context menu state
+	let contextMenu = $state<{ roomId: string; x: number; y: number } | null>(null);
+
+	function openContextMenu(e: MouseEvent, roomId: string) {
+		e.preventDefault();
+		contextMenu = { roomId, x: e.clientX, y: e.clientY };
+	}
+
+	async function handleLeave(roomId: string) {
+		contextMenu = null;
+		try {
+			await leaveRoom(roomId);
+			if (roomsState.activeRoomId === roomId) roomsState.activeRoomId = null;
+		} catch (err) {
+			console.error('Failed to leave room:', err);
+		}
+	}
 
 	const title = $derived(
 		roomsState.activeSpaceId === null
@@ -32,10 +51,10 @@
 
 	const showDMs = $derived(roomsState.activeSpaceId === null && roomsState.directRooms.length > 0);
 
-	async function handleJoin(roomId: string) {
+	async function handleJoin(roomId: string, via?: string[]) {
 		joiningIds = new Set(joiningIds).add(roomId);
 		try {
-			await joinRoom(roomId);
+			await joinRoom(roomId, via);
 			// Mark as joined in hierarchy so the UI updates immediately
 			roomsState.spaceHierarchy = roomsState.spaceHierarchy.map((r) =>
 				r.roomId === roomId ? { ...r, isJoined: true } : r
@@ -48,6 +67,33 @@
 			const next = new Set(joiningIds);
 			next.delete(roomId);
 			joiningIds = next;
+		}
+	}
+
+	async function handleAccept(roomId: string) {
+		inviteActionIds = new Set(inviteActionIds).add(roomId);
+		try {
+			await acceptInvite(roomId);
+			setActiveRoom(roomId);
+		} catch (err) {
+			console.error('Failed to accept invite:', err);
+		} finally {
+			const next = new Set(inviteActionIds);
+			next.delete(roomId);
+			inviteActionIds = next;
+		}
+	}
+
+	async function handleReject(roomId: string) {
+		inviteActionIds = new Set(inviteActionIds).add(roomId);
+		try {
+			await rejectInvite(roomId);
+		} catch (err) {
+			console.error('Failed to reject invite:', err);
+		} finally {
+			const next = new Set(inviteActionIds);
+			next.delete(roomId);
+			inviteActionIds = next;
 		}
 	}
 
@@ -71,6 +117,40 @@
 	<!-- Room list -->
 	<div class="flex-1 overflow-y-auto py-2">
 
+		<!-- Pending invites -->
+		{#if roomsState.invitedRooms.length > 0}
+			<div class="px-2 mb-2">
+				<p class="px-2 py-1 text-xs font-semibold text-discord-textMuted uppercase tracking-wide">Invites</p>
+				{#each roomsState.invitedRooms as room (room.roomId)}
+					{@const busy = inviteActionIds.has(room.roomId)}
+					{@const sender = getInviteSender(room)}
+					<div class="flex flex-col gap-1.5 px-2 py-2 rounded bg-discord-messageHover mb-1">
+						<div class="flex items-center gap-2 min-w-0">
+							<Avatar src={getRoomAvatar(room)} name={getRoomDisplayName(room)} size={24} />
+							<div class="flex-1 min-w-0">
+								<p class="text-sm font-semibold text-discord-textPrimary truncate">{getRoomDisplayName(room)}</p>
+								{#if sender}
+									<p class="text-xs text-discord-textMuted truncate">from {sender}</p>
+								{/if}
+							</div>
+						</div>
+						<div class="flex gap-1.5">
+							<button
+								onclick={() => handleAccept(room.roomId)}
+								disabled={busy}
+								class="flex-1 py-1 rounded text-xs font-semibold bg-discord-accent hover:bg-discord-accentHover text-white transition-colors disabled:opacity-50"
+							>Accept</button>
+							<button
+								onclick={() => handleReject(room.roomId)}
+								disabled={busy}
+								class="flex-1 py-1 rounded text-xs font-semibold bg-discord-backgroundPrimary hover:bg-discord-danger text-discord-textMuted hover:text-white transition-colors disabled:opacity-50"
+							>Reject</button>
+						</div>
+					</div>
+				{/each}
+			</div>
+		{/if}
+
 		<!-- Joined rooms / channels -->
 		{#if visibleRooms.length > 0}
 			<div class="px-2 mb-2">
@@ -81,6 +161,7 @@
 					{@const { isActive, unread } = roomButton(room)}
 					<button
 						onclick={() => setActiveRoom(room.roomId)}
+						oncontextmenu={(e) => openContextMenu(e, room.roomId)}
 						class="w-full flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-left"
 						class:bg-discord-messageHover={isActive}
 						class:text-discord-textPrimary={isActive || unread > 0}
@@ -125,7 +206,7 @@
 
 						<!-- Join button -->
 						<button
-							onclick={() => handleJoin(room.roomId)}
+							onclick={() => handleJoin(room.roomId, room.via)}
 							disabled={isJoining}
 							class="flex-shrink-0 px-2 py-0.5 text-xs font-semibold rounded bg-discord-accent hover:bg-discord-accentHover text-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed opacity-0 group-hover:opacity-100"
 						>
@@ -153,6 +234,7 @@
 					{@const avatarSrc = getRoomAvatar(room)}
 					<button
 						onclick={() => setActiveRoom(room.roomId)}
+						oncontextmenu={(e) => openContextMenu(e, room.roomId)}
 						class="w-full flex items-center gap-2 px-2 py-1.5 rounded transition-colors text-left"
 						class:bg-discord-messageHover={isActive}
 						class:text-discord-textPrimary={isActive || unread > 0}
@@ -200,3 +282,17 @@
 		</button>
 	</div>
 </div>
+
+{#if contextMenu}
+	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+	<div class="fixed inset-0 z-50" onclick={() => contextMenu = null}></div>
+	<div
+		class="fixed z-50 bg-discord-backgroundTertiary border border-discord-divider rounded-lg shadow-xl py-1 min-w-36"
+		style="left: {contextMenu.x}px; top: {contextMenu.y}px"
+	>
+		<button
+			onclick={() => handleLeave(contextMenu!.roomId)}
+			class="w-full text-left px-3 py-1.5 text-sm text-discord-danger hover:bg-discord-danger hover:text-white transition-colors"
+		>Leave Room</button>
+	</div>
+{/if}
