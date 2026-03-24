@@ -69,6 +69,7 @@
 			if (!openingGesture && !closingGesture) { dragPending = false; cleanupDocListeners(); return; }
 			dragPending = false;
 			isDragging = true;
+			(document.activeElement as HTMLElement)?.blur();
 		}
 
 		if (isDragging) {
@@ -228,7 +229,7 @@
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
 		class="flex overflow-hidden bg-discord-background"
-		style="height: 100dvh;"
+		style="position: fixed; inset: 0;"
 		ontouchstart={drawerDragStart}
 	>
 		<!-- Sync state banner -->

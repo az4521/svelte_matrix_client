@@ -135,6 +135,7 @@
 			if (!openingGesture && !closingGesture) { memberDragPending = false; cleanupMemberListeners(); return; }
 			memberDragPending = false;
 			isMemberDragging = true;
+			(document.activeElement as HTMLElement)?.blur();
 		}
 
 		if (isMemberDragging) {
