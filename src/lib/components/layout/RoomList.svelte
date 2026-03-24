@@ -23,6 +23,35 @@
 		contextMenu = { roomId, x: e.clientX, y: e.clientY };
 	}
 
+	let ctxTouchTimer: ReturnType<typeof setTimeout> | null = null;
+	let ctxTouchStartX = 0, ctxTouchStartY = 0;
+
+	function onRoomTouchStart(e: TouchEvent, roomId: string) {
+		const t = e.touches[0];
+		ctxTouchStartX = t.clientX;
+		ctxTouchStartY = t.clientY;
+		ctxTouchTimer = setTimeout(() => {
+			ctxTouchTimer = null;
+			navigator.vibrate?.(50);
+			contextMenu = { roomId, x: ctxTouchStartX, y: ctxTouchStartY };
+		}, 500);
+	}
+
+	function onRoomTouchMove(e: TouchEvent) {
+		if (!ctxTouchTimer) return;
+		const t = e.touches[0];
+		const dx = t.clientX - ctxTouchStartX;
+		const dy = t.clientY - ctxTouchStartY;
+		if (Math.sqrt(dx * dx + dy * dy) > 10) {
+			clearTimeout(ctxTouchTimer);
+			ctxTouchTimer = null;
+		}
+	}
+
+	function onRoomTouchEnd() {
+		if (ctxTouchTimer) { clearTimeout(ctxTouchTimer); ctxTouchTimer = null; }
+	}
+
 	async function handleLeave(roomId: string) {
 		contextMenu = null;
 		try {
@@ -162,6 +191,9 @@
 					<button
 						onclick={() => setActiveRoom(room.roomId)}
 						oncontextmenu={(e) => openContextMenu(e, room.roomId)}
+					ontouchstart={(e) => onRoomTouchStart(e, room.roomId)}
+					ontouchmove={onRoomTouchMove}
+					ontouchend={onRoomTouchEnd}
 						class="w-full flex items-center gap-2 pr-2 py-1.5 transition-colors text-left"
 						class:text-discord-textPrimary={isActive || unread > 0}
 						class:text-discord-textMuted={!isActive && unread === 0}
@@ -235,6 +267,9 @@
 					<button
 						onclick={() => setActiveRoom(room.roomId)}
 						oncontextmenu={(e) => openContextMenu(e, room.roomId)}
+					ontouchstart={(e) => onRoomTouchStart(e, room.roomId)}
+					ontouchmove={onRoomTouchMove}
+					ontouchend={onRoomTouchEnd}
 						class="w-full flex items-center gap-2 pr-2 py-1.5 transition-colors text-left"
 						class:text-discord-textPrimary={isActive || unread > 0}
 						class:text-discord-textMuted={!isActive && unread === 0}

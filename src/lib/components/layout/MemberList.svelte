@@ -29,7 +29,7 @@
 	}
 </script>
 
-<div class="w-60 bg-discord-backgroundSecondary flex flex-col flex-shrink-0 overflow-hidden">
+<div class="w-60 h-full bg-discord-backgroundSecondary flex flex-col flex-shrink-0 overflow-hidden">
 	<div class="h-12 px-4 flex items-center border-b border-discord-divider flex-shrink-0">
 		<h3 class="text-xs font-semibold text-discord-textMuted uppercase tracking-wide">
 			Members — {members.length}

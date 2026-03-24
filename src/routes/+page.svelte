@@ -109,7 +109,7 @@
 	<title>Matrix Client — {mode === 'login' ? 'Sign In' : 'Register'}</title>
 </svelte:head>
 
-<div class="min-h-screen flex items-center justify-center bg-discord-backgroundTertiary p-4">
+<div class="flex items-center justify-center bg-discord-backgroundTertiary p-4" style="min-height: 100dvh;">
 	<div class="w-full max-w-md">
 		<!-- Card -->
 		<div class="bg-discord-background rounded-lg shadow-2xl p-8">

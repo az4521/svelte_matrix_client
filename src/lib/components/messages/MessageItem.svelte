@@ -364,7 +364,7 @@
 						<img
 							{src}
 							alt={body()}
-							class="max-w-sm max-h-72 rounded-lg object-contain cursor-pointer block"
+							class="max-w-sm w-full max-h-72 rounded-lg object-contain cursor-pointer block"
 							loading="lazy"
 						/>
 					</a>
@@ -393,7 +393,7 @@
 				<span class="text-xs text-discord-textMuted italic">[Image unavailable]</span>
 			{/if}
 		{:else if msgtype === 'm.file'}
-			<div class="flex items-center gap-2 p-3 bg-discord-backgroundSecondary rounded-lg mt-1 max-w-sm">
+			<div class="flex items-center gap-2 p-3 bg-discord-backgroundSecondary rounded-lg mt-1 max-w-sm w-full">
 				<svg class="w-8 h-8 text-discord-accent flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
 					<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
 				</svg>
@@ -600,5 +600,20 @@
 		height: 36px;
 		width: auto;
 		vertical-align: -0.4em;
+	}
+
+	/* Prevent server-sent HTML content from overflowing on mobile */
+	:global(.message-body img) {
+		max-width: 100%;
+		height: auto;
+	}
+	:global(.message-body pre) {
+		overflow-x: auto;
+		max-width: 100%;
+	}
+	:global(.message-body table) {
+		display: block;
+		overflow-x: auto;
+		max-width: 100%;
 	}
 </style>

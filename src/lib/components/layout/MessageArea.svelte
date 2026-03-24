@@ -25,9 +25,11 @@
 	interface Props {
 		room: Room;
 		showMemberList: boolean;
+		isMobile?: boolean;
+		onMenuOpen?: () => void;
 	}
 
-	let { room, showMemberList = true }: Props = $props();
+	let { room, showMemberList = true, isMobile = false, onMenuOpen }: Props = $props();
 
 	let scrollEl: HTMLDivElement | undefined = $state();
 	let messageInputEl: ReturnType<typeof MessageInput> | undefined = $state();
@@ -79,6 +81,11 @@
 	}
 	// untrack avoids the "captures initial value" warning - we intentionally want the initial prop value
 	let showMemberListLocal = $state(untrack(() => showMemberList));
+
+	// Hide member list when switching to mobile (isMobile is set async in onMount)
+	$effect(() => {
+		if (isMobile) showMemberListLocal = false;
+	});
 
 	const roomId = $derived(room.roomId);
 	const roomName = $derived(getRoomDisplayName(room));
@@ -284,6 +291,17 @@
 	<div class="flex-1 flex flex-col min-w-0 overflow-hidden">
 		<!-- Room header -->
 		<div class="h-12 px-4 flex items-center gap-3 border-b border-discord-divider shadow-sm flex-shrink-0">
+			{#if isMobile}
+				<button
+					onclick={onMenuOpen}
+					class="p-1.5 -ml-1 rounded text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors flex-shrink-0"
+					title="Open room list"
+				>
+					<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+						<path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+					</svg>
+				</button>
+			{/if}
 			<span class="text-xl font-bold text-discord-textMuted flex-shrink-0">#</span>
 			<h2 class="font-semibold text-discord-textPrimary">{roomName}</h2>
 			{#if topic}
@@ -306,7 +324,7 @@
 		<div
 			bind:this={scrollEl}
 			onscroll={onScroll}
-			class="flex-1 overflow-y-auto py-4"
+			class="flex-1 overflow-y-auto overflow-x-hidden py-4"
 		>
 			<!-- Load more indicator -->
 			{#if loadingOlder}
@@ -349,7 +367,7 @@
 
 		<!-- Scroll to bottom button -->
 		{#if !isAtBottom && messages.length > 0}
-			<div class="absolute bottom-20 right-72 z-10">
+			<div class="absolute bottom-20 {showMemberListLocal && !isMobile ? 'right-72' : 'right-4'} z-10">
 				<button
 					onclick={() => scrollToBottom(false)}
 					class="bg-discord-backgroundSecondary hover:bg-discord-messageHover text-discord-textPrimary px-3 py-1.5 rounded-full shadow-lg text-sm font-medium border border-discord-divider transition-colors flex items-center gap-1.5"
@@ -377,8 +395,16 @@
 	<!-- Debug panel (Ctrl+Shift+D to toggle) -->
 	<DebugPanel {room} />
 
-	<!-- Member list sidebar -->
+	<!-- Member list sidebar (overlay on mobile, inline on desktop) -->
 	{#if showMemberListLocal}
-		<MemberList {room} />
+		{#if isMobile}
+			<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+			<div class="absolute inset-0 z-30 bg-black/50" onclick={() => (showMemberListLocal = false)}></div>
+			<div class="absolute inset-y-0 right-0 z-40 w-60 h-full shadow-2xl">
+				<MemberList {room} />
+			</div>
+		{:else}
+			<MemberList {room} />
+		{/if}
 	{/if}
 </div>

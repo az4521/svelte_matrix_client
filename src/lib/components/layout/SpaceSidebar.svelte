@@ -216,12 +216,11 @@
 		dropTarget = null;
 	}
 
-	function onDrop(e: DragEvent) {
-		e.preventDefault();
+	function performDrop() {
 		if (!dragState) { onDragEnd(); return; }
 
 		if (!dropTarget) {
-			// Dropped in empty space below items — move folder-space to root end
+			// Dropped in empty space — move folder-space to root end
 			if (dragState.fromFolderId !== null) {
 				const layout = getLayout();
 				layout.folders[dragState.fromFolderId].spaceIds = layout.folders[dragState.fromFolderId].spaceIds.filter(id => id !== dragState!.id);
@@ -240,23 +239,17 @@
 		const toFolderId = spaceFolderMap.get(toId) ?? null;
 		const toIsFolder = !!layout.folders[toId];
 
-		// Step 1: Remove fromId from its source
 		if (fromFolderId !== null) {
 			layout.folders[fromFolderId].spaceIds = layout.folders[fromFolderId].spaceIds.filter(id => id !== fromId);
 		} else {
 			layout.order = layout.order.filter(id => id !== fromId);
 		}
 
-		// Step 2: Insert at target
 		if (position === 'into') {
 			if (toIsFolder) {
-				// Add space to existing folder
-				if (!layout.folders[toId].spaceIds.includes(fromId)) {
-					layout.folders[toId].spaceIds.push(fromId);
-				}
+				if (!layout.folders[toId].spaceIds.includes(fromId)) layout.folders[toId].spaceIds.push(fromId);
 				expandedFolders = new Set([...expandedFolders, toId]);
 			} else {
-				// Merge two root spaces into a new folder
 				const toIndex = layout.order.indexOf(toId);
 				layout.order.splice(toIndex, 1);
 				const folderId = `folder_${Date.now()}`;
@@ -265,13 +258,11 @@
 				expandedFolders = new Set([...expandedFolders, folderId]);
 			}
 		} else if (toFolderId !== null) {
-			// Insert before/after a folder-space (reorder within folder or move into folder)
 			const folderSpaces = layout.folders[toFolderId].spaceIds.filter(id => id !== fromId);
 			const toIndex = folderSpaces.indexOf(toId);
 			folderSpaces.splice(position === 'before' ? toIndex : toIndex + 1, 0, fromId);
 			layout.folders[toFolderId].spaceIds = folderSpaces;
 		} else {
-			// Insert before/after a root item
 			const toIndex = layout.order.indexOf(toId);
 			layout.order.splice(position === 'before' ? toIndex : toIndex + 1, 0, fromId);
 		}
@@ -280,15 +271,20 @@
 		onDragEnd();
 	}
 
+	function onDrop(e: DragEvent) {
+		e.preventDefault();
+		performDrop();
+	}
+
 	// --- Context menu ---
 
-	function openSpaceContextMenu(e: MouseEvent, spaceId: string, folderId: string | null = null) {
-		e.preventDefault();
+	function openSpaceContextMenu(e: MouseEvent | { clientX: number; clientY: number }, spaceId: string, folderId: string | null = null) {
+		if (e instanceof MouseEvent) e.preventDefault();
 		contextMenu = { kind: 'space', spaceId, folderId, x: e.clientX, y: e.clientY };
 	}
 
-	function openFolderContextMenu(e: MouseEvent, folderId: string) {
-		e.preventDefault();
+	function openFolderContextMenu(e: MouseEvent | { clientX: number; clientY: number }, folderId: string) {
+		if (e instanceof MouseEvent) e.preventDefault();
 		contextMenu = { kind: 'folder', folderId, x: e.clientX, y: e.clientY };
 	}
 
@@ -372,6 +368,102 @@
 		else next.add(folderId);
 		expandedFolders = next;
 	}
+
+	// --- Touch drag & long-press ---
+
+	let touchDragActive = $state(false);
+	let touchGhostId = $state<string | null>(null);
+	let touchGhostX = $state(0);
+	let touchGhostY = $state(0);
+
+	let dragTouchTimer: ReturnType<typeof setTimeout> | null = null;
+	let ctxTouchTimer: ReturnType<typeof setTimeout> | null = null;
+	let touchStartX = 0, touchStartY = 0, touchHasMoved = false;
+
+	function onItemTouchStart(
+		e: TouchEvent,
+		id: string,
+		fromFolderId: string | null,
+		openCtx: (x: number, y: number) => void
+	) {
+		const t = e.touches[0];
+		touchStartX = t.clientX;
+		touchStartY = t.clientY;
+		touchHasMoved = false;
+
+		// 300ms → start drag
+		dragTouchTimer = setTimeout(() => {
+			dragTouchTimer = null;
+			if (touchHasMoved) return;
+			touchDragActive = true;
+			touchGhostId = id;
+			touchGhostX = touchStartX;
+			touchGhostY = touchStartY;
+			dragState = { id, fromFolderId };
+			navigator.vibrate?.(30);
+		}, 300);
+
+		// 600ms → context menu (cancels drag if it started)
+		ctxTouchTimer = setTimeout(() => {
+			ctxTouchTimer = null;
+			if (touchHasMoved) return;
+			if (touchDragActive) {
+				touchDragActive = false;
+				touchGhostId = null;
+				dragState = null;
+				dropTarget = null;
+			}
+			navigator.vibrate?.(50);
+			openCtx(touchStartX, touchStartY);
+		}, 600);
+	}
+
+	function onItemTouchMove(e: TouchEvent) {
+		const t = e.touches[0];
+		const dx = t.clientX - touchStartX;
+		const dy = t.clientY - touchStartY;
+		if (Math.sqrt(dx * dx + dy * dy) > 8) {
+			touchHasMoved = true;
+			if (ctxTouchTimer) { clearTimeout(ctxTouchTimer); ctxTouchTimer = null; }
+			if (dragTouchTimer) { clearTimeout(dragTouchTimer); dragTouchTimer = null; }
+		}
+
+		if (!touchDragActive) return;
+		e.preventDefault();
+
+		touchGhostX = t.clientX;
+		touchGhostY = t.clientY;
+
+		// Find drop target under finger
+		const el = document.elementFromPoint(t.clientX, t.clientY);
+		const btn = el?.closest('[data-drag-id]') as HTMLElement | null;
+		if (btn) {
+			const targetId = btn.dataset.dragId!;
+			const targetKind = btn.dataset.dragKind as 'space' | 'folder';
+			if (targetId && targetId !== dragState?.id) {
+				const rect = btn.getBoundingClientRect();
+				const rel = (t.clientY - rect.top) / rect.height;
+				let position: 'before' | 'after' | 'into';
+				if (isDraggingSpace() && (targetKind === 'space' || targetKind === 'folder')) {
+					position = rel < 0.3 ? 'before' : rel > 0.7 ? 'after' : 'into';
+				} else {
+					position = rel < 0.5 ? 'before' : 'after';
+				}
+				dropTarget = { id: targetId, position };
+			}
+		} else {
+			dropTarget = null;
+		}
+	}
+
+	function onItemTouchEnd() {
+		if (dragTouchTimer) { clearTimeout(dragTouchTimer); dragTouchTimer = null; }
+		if (ctxTouchTimer) { clearTimeout(ctxTouchTimer); ctxTouchTimer = null; }
+		if (!touchDragActive) return;
+		touchDragActive = false;
+		touchGhostId = null;
+		performDrop();
+	}
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -420,6 +512,11 @@
 				ondragstart={(e) => onDragStart(e, item.space.roomId, null)}
 				ondragover={(e) => onRootItemDragOver(e, item.id, 'space')}
 				ondragend={onDragEnd}
+				ontouchstart={(e) => onItemTouchStart(e, item.space.roomId, null, (x, y) => openSpaceContextMenu({ clientX: x, clientY: y }, item.space.roomId))}
+				ontouchmove={onItemTouchMove}
+				ontouchend={onItemTouchEnd}
+				data-drag-id={item.space.roomId}
+				data-drag-kind="space"
 				class="group relative w-12 h-12 flex items-center justify-center transition-all duration-200 flex-shrink-0"
 				class:opacity-40={dragState?.id === item.id}
 				class:ring-2={isMergeTarget}
@@ -450,6 +547,11 @@
 					ondragstart={(e) => onDragStart(e, item.id, null)}
 					ondragover={(e) => onRootItemDragOver(e, item.id, 'folder')}
 					ondragend={onDragEnd}
+					ontouchstart={(e) => onItemTouchStart(e, item.id, null, (x, y) => openFolderContextMenu({ clientX: x, clientY: y }, item.id))}
+					ontouchmove={onItemTouchMove}
+					ontouchend={onItemTouchEnd}
+					data-drag-id={item.id}
+					data-drag-kind="folder"
 					class="group relative w-12 h-12 flex items-center justify-center flex-shrink-0"
 					class:ring-2={isIntoTarget}
 					class:ring-discord-accent={isIntoTarget}
@@ -491,6 +593,11 @@
 								draggable="true"
 								ondragstart={(e) => onDragStart(e, space.roomId, item.id)}
 								ondragover={(e) => onFolderSpaceDragOver(e, space.roomId)}
+							ontouchstart={(e) => onItemTouchStart(e, space.roomId, item.id, (x, y) => openSpaceContextMenu({ clientX: x, clientY: y }, space.roomId, item.id))}
+							ontouchmove={onItemTouchMove}
+							ontouchend={onItemTouchEnd}
+							data-drag-id={space.roomId}
+							data-drag-kind="space"
 								ondragend={onDragEnd}
 								class="group relative w-9 h-9 flex items-center justify-center transition-all duration-200 flex-shrink-0"
 								class:opacity-40={dragState?.id === space.roomId}
@@ -654,6 +761,25 @@
 					>Cancel</button>
 				</div>
 			</div>
+		</div>
+	{/if}
+
+	<!-- Touch drag ghost -->
+	{#if touchDragActive && touchGhostId}
+		{@const ghostSpace = roomsState.spaces.find((s) => s.roomId === touchGhostId)}
+		<div
+			class="fixed z-[100] pointer-events-none w-12 h-12 rounded-xl shadow-2xl opacity-90"
+			style="left: {touchGhostX - 24}px; top: {touchGhostY - 24}px; transform: scale(1.15);"
+		>
+			{#if ghostSpace}
+				<Avatar src={getRoomAvatar(ghostSpace)} name={ghostSpace.name || '?'} size={48} rounded="none" class="rounded-xl w-full h-full" />
+			{:else}
+				<div class="w-12 h-12 rounded-xl bg-discord-backgroundSecondary flex items-center justify-center">
+					<svg class="w-6 h-6 text-discord-textMuted" fill="currentColor" viewBox="0 0 24 24">
+						<path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+					</svg>
+				</div>
+			{/if}
 		</div>
 	{/if}
 

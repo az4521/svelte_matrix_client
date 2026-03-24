@@ -8,6 +8,7 @@
 
 	import { auth, clearSession } from '$lib/stores/auth.svelte';
 	import { roomsState, setActiveSpace } from '$lib/stores/rooms.svelte';
+	import { mobileState } from '$lib/stores/mobile.svelte';
 	import { initFavourites } from '$lib/stores/favourites.svelte';
 	import {
 		getSpaces,
@@ -24,6 +25,21 @@
 	} from '$lib/matrix/client';
 
 	let showSettings = $state(false);
+
+	// Swipe gestures for mobile drawers
+	let swipeStartX = 0, swipeStartY = 0;
+	function onSwipeTouchStart(e: TouchEvent) {
+		swipeStartX = e.touches[0].clientX;
+		swipeStartY = e.touches[0].clientY;
+	}
+	function onSwipeTouchEnd(e: TouchEvent) {
+		if (!mobileState.isMobile) return;
+		const dx = e.changedTouches[0].clientX - swipeStartX;
+		const dy = e.changedTouches[0].clientY - swipeStartY;
+		if (Math.abs(dy) > Math.abs(dx) * 1.2 || Math.abs(dx) < 50) return;
+		if (dx > 0) mobileState.leftOpen = true;
+		else mobileState.leftOpen = false;
+	}
 
 	// Redirect if not authenticated
 	$effect(() => {
@@ -70,12 +86,25 @@
 
 		refreshRooms();
 
+		const mq = window.matchMedia('(max-width: 767px)');
+		mobileState.isMobile = mq.matches;
+		const onMqChange = (e: MediaQueryListEvent) => {
+			mobileState.isMobile = e.matches;
+			if (!e.matches) mobileState.leftOpen = false;
+		};
+		mq.addEventListener('change', onMqChange);
+
 		const unsubRooms = onRoomUpdate(() => refreshRooms());
 		const unsubFavourites = initFavourites();
 		const unsubAccountData = onAccountData((type) => {
 			if (type === 'im.client.space_layout' || type === 'im.client.space_order') refreshRooms();
 		});
-		return () => { unsubRooms(); unsubFavourites(); unsubAccountData(); };
+		return () => {
+			unsubRooms();
+			unsubFavourites();
+			unsubAccountData();
+			mq.removeEventListener('change', onMqChange);
+		};
 	});
 
 	// Update rooms list and fetch full hierarchy when selected space changes
@@ -118,14 +147,20 @@
 </svelte:head>
 
 {#if !auth.isAuthenticated}
-	<div class="min-h-screen flex items-center justify-center bg-discord-backgroundTertiary">
+	<div class="flex items-center justify-center bg-discord-backgroundTertiary" style="min-height: 100dvh;">
 		<div class="flex items-center gap-3 text-discord-textMuted">
 			<div class="w-6 h-6 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
 			<span>Redirecting…</span>
 		</div>
 	</div>
 {:else}
-	<div class="flex h-screen overflow-hidden bg-discord-background">
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div
+		class="flex overflow-hidden bg-discord-background"
+		style="height: 100dvh;"
+		ontouchstart={onSwipeTouchStart}
+		ontouchend={onSwipeTouchEnd}
+	>
 		<!-- Sync state banner -->
 		{#if auth.syncState !== 'PREPARED' && auth.syncState !== 'SYNCING'}
 			<div class="absolute top-0 left-0 right-0 z-50 bg-discord-warning/90 text-discord-backgroundTertiary text-sm font-medium text-center py-1.5">
@@ -139,13 +174,31 @@
 			</div>
 		{/if}
 
-		<SpaceSidebar onHomeClick={() => setActiveSpace(null)} onSettingsClick={() => showSettings = !showSettings} />
-
-		<RoomList onLogout={handleLogout} />
+		{#if !mobileState.isMobile}
+			<!-- Desktop: permanent sidebars -->
+			<SpaceSidebar onHomeClick={() => setActiveSpace(null)} onSettingsClick={() => showSettings = !showSettings} />
+			<RoomList onLogout={handleLogout} />
+		{:else if mobileState.leftOpen}
+			<!-- Mobile: left drawer -->
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
+			<div class="fixed inset-0 z-30 bg-black/50" onclick={() => mobileState.leftOpen = false}></div>
+			<div class="fixed inset-y-0 left-0 z-40 flex shadow-2xl">
+				<SpaceSidebar
+					onHomeClick={() => { setActiveSpace(null); mobileState.leftOpen = false; }}
+					onSettingsClick={() => { showSettings = !showSettings; mobileState.leftOpen = false; }}
+				/>
+				<RoomList onLogout={handleLogout} />
+			</div>
+		{/if}
 
 		<main class="flex flex-1 min-w-0 overflow-hidden bg-discord-background">
 			{#if activeRoom}
-				<MessageArea room={activeRoom} showMemberList={true} />
+				<MessageArea
+					room={activeRoom}
+					showMemberList={!mobileState.isMobile}
+					isMobile={mobileState.isMobile}
+					onMenuOpen={() => (mobileState.leftOpen = true)}
+				/>
 			{:else}
 				<div class="flex-1 flex flex-col items-center justify-center text-center p-8">
 					<div class="w-24 h-24 rounded-full bg-discord-backgroundSecondary flex items-center justify-center mb-6">
@@ -159,6 +212,12 @@
 							? 'Choose a room or direct message from the sidebar to start chatting.'
 							: 'Choose a channel from the list on the left to start chatting.'}
 					</p>
+					{#if mobileState.isMobile}
+						<button
+							onclick={() => (mobileState.leftOpen = true)}
+							class="mt-6 px-5 py-2.5 bg-discord-accent hover:bg-discord-accentHover text-white rounded-lg text-sm font-semibold transition-colors"
+						>Open Room List</button>
+					{/if}
 				</div>
 			{/if}
 		</main>

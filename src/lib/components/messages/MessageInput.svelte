@@ -6,6 +6,7 @@
 	import StickerPicker from '$lib/components/ui/StickerPicker.svelte';
 	import GifPicker from '$lib/components/ui/GifPicker.svelte';
 	import { roomsState } from '$lib/stores/rooms.svelte';
+	import { mobileState } from '$lib/stores/mobile.svelte';
 
 	interface Props {
 		roomId: string;
@@ -160,7 +161,7 @@
 	}
 
 	function onKeydown(e: KeyboardEvent) {
-		if (e.key === 'Enter' && !e.shiftKey) {
+		if (e.key === 'Enter' && !e.shiftKey && !mobileState.isMobile) {
 			e.preventDefault();
 			send();
 		}
@@ -465,14 +466,14 @@
 		</button>
 	</div>
 	<div class="relative mt-1 px-1 h-4">
-		{#if typingUsers.length === 0}
-		<p class="text-xs text-discord-textMuted">
-			<kbd class="font-mono">Enter</kbd> to send &middot;
-			<kbd class="font-mono">Shift+Enter</kbd> for new line
-			{#if replyToEvent}&middot; <kbd class="font-mono">Esc</kbd> to cancel reply{/if}
-		</p>
-		{:else}
+		{#if typingUsers.length > 0}
 			<p class="absolute inset-0 text-xs text-discord-textMuted bg-discord-backgroundPrimary/90">{typingText()}</p>
+		{:else if !mobileState.isMobile}
+			<p class="text-xs text-discord-textMuted">
+				<kbd class="font-mono">Enter</kbd> to send &middot;
+				<kbd class="font-mono">Shift+Enter</kbd> for new line
+				{#if replyToEvent}&middot; <kbd class="font-mono">Esc</kbd> to cancel reply{/if}
+			</p>
 		{/if}
 	</div>
 </div>
