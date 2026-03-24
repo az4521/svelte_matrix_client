@@ -92,7 +92,7 @@
 	}
 
 	function drawerDragStart(e: TouchEvent) {
-		if (!mobileState.isMobile || isDragging || dragPending || mobileState.rightOpen) return;
+		if (!mobileState.isMobile || isDragging || dragPending || mobileState.rightOpen || mobileState.lightboxOpen) return;
 		dragStartX = e.touches[0].clientX;
 		dragStartY = e.touches[0].clientY;
 		dragBaseTranslate = mobileState.leftOpen ? 0 : -DRAWER_WIDTH;

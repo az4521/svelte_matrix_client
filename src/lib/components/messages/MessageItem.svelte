@@ -369,6 +369,11 @@
 				/>
 			{/if}
 		{:else if msgtype === 'm.image'}
+			{#if body()}
+				<div class="message-body text-sm text-discord-textPrimary leading-relaxed break-words">
+					{@html withTwemoji(plainToHtml(body()))}
+				</div>
+			{/if}
 			{@const src = mediaStore.resolve(imageHttpUrl())}
 			{#if src}
 				<div class="relative inline-block group/img mt-1">

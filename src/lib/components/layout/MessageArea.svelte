@@ -152,7 +152,7 @@
 	}
 
 	function memberDragStart(e: TouchEvent) {
-		if (!isMobile || isMemberDragging || memberDragPending || mobileState.leftOpen) return;
+		if (!isMobile || isMemberDragging || memberDragPending || mobileState.leftOpen || mobileState.lightboxOpen) return;
 		memberDragStartX = e.touches[0].clientX;
 		memberDragStartY = e.touches[0].clientY;
 		memberDragBase = showMemberListLocal ? 0 : MEMBER_WIDTH;

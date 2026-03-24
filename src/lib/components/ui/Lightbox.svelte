@@ -5,7 +5,15 @@
 		onClose: () => void;
 	}
 
+	import { mobileState } from '$lib/stores/mobile.svelte';
+	import { onMount } from 'svelte';
+
 	let { src, alt = '', onClose }: Props = $props();
+
+	onMount(() => {
+		mobileState.lightboxOpen = true;
+		return () => { mobileState.lightboxOpen = false; };
+	});
 
 	function onKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') onClose();
