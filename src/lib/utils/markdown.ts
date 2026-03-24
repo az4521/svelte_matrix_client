@@ -29,6 +29,13 @@ function processInline(raw: string): { html: string; changed: boolean } {
 	});
 	const hadSpans = spans.length > 0;
 
+	// Stash backslash-escaped characters so they survive formatting passes
+	const escaped: string[] = [];
+	s = s.replace(/\\([\\`*_~|#>![\](){}])/g, (_, ch) => {
+		escaped.push(escapeHtml(ch));
+		return `\x04${escaped.length - 1}\x05`;
+	});
+
 	// Escape remaining HTML entities
 	s = escapeHtml(s);
 
@@ -41,10 +48,11 @@ function processInline(raw: string): { html: string; changed: boolean } {
 	s = s.replace(/\*([^*\n]+?)\*/g, '<em>$1</em>');
 	s = s.replace(/_([^_\n]+?)_/g, '<em>$1</em>');
 
-	// Restore code spans
+	// Restore escaped characters and code spans
+	s = s.replace(/\x04(\d+)\x05/g, (_, i) => escaped[+i]);
 	s = s.replace(/\x02(\d+)\x03/g, (_, i) => spans[+i]);
 
-	return { html: s, changed: hadSpans || s !== escapeHtml(raw) };
+	return { html: s, changed: hadSpans || escaped.length > 0 || s !== escapeHtml(raw) };
 }
 
 export function parseMarkdown(input: string): { formattedBody: string; hasFormatting: boolean } {
@@ -54,10 +62,13 @@ export function parseMarkdown(input: string): { formattedBody: string; hasFormat
 	let i = 0;
 
 	while (i < lines.length) {
-		const line = lines[i];
+		const raw = lines[i];
+		// Strip a leading backslash that escapes a block-level marker
+		const line = /^\\([>`#\-])/.test(raw) ? raw.slice(1) : raw;
+		const blockEscaped = line !== raw;
 
 		// Fenced code block
-		if (line.trimStart().startsWith('```')) {
+		if (!blockEscaped && line.trimStart().startsWith('```')) {
 			const langMatch = line.trimStart().match(/^```(\w*)/);
 			const lang = langMatch?.[1] ?? '';
 			const codeLines: string[] = [];
@@ -82,7 +93,7 @@ export function parseMarkdown(input: string): { formattedBody: string; hasFormat
 		}
 
 		// Blockquote
-		if (line.startsWith('> ') || line === '>') {
+		if (!blockEscaped && (line.startsWith('> ') || line === '>')) {
 			const content = line.startsWith('> ') ? line.slice(2) : '';
 			const { html } = processInline(content);
 			parts.push(`<blockquote>${html}</blockquote>`);
@@ -92,7 +103,7 @@ export function parseMarkdown(input: string): { formattedBody: string; hasFormat
 		}
 
 		// Headings (# / ## / ###)
-		const hMatch = line.match(/^(#{1,3})\s+(.+)/);
+		const hMatch = !blockEscaped ? line.match(/^(#{1,3})\s+(.+)/) : null;
 		if (hMatch) {
 			const level = hMatch[1].length;
 			const { html } = processInline(hMatch[2]);
@@ -103,7 +114,7 @@ export function parseMarkdown(input: string): { formattedBody: string; hasFormat
 		}
 
 		// Subtext (-# prefix)
-		if (line.startsWith('-# ')) {
+		if (!blockEscaped && line.startsWith('-# ')) {
 			const { html } = processInline(line.slice(3));
 			parts.push(`<small>${html}</small>`);
 			hasFormatting = true;
@@ -112,7 +123,7 @@ export function parseMarkdown(input: string): { formattedBody: string; hasFormat
 		}
 
 		// Unordered list (lines starting with "- ")
-		if (line.startsWith('- ') || line === '-') {
+		if (!blockEscaped && (line.startsWith('- ') || line === '-')) {
 			const items: string[] = [];
 			while (i < lines.length && (lines[i].startsWith('- ') || lines[i] === '-')) {
 				const content = lines[i].startsWith('- ') ? lines[i].slice(2) : '';
@@ -126,7 +137,7 @@ export function parseMarkdown(input: string): { formattedBody: string; hasFormat
 		}
 
 		// Ordered list (lines starting with "N. ")
-		if (/^\d+\.\s/.test(line)) {
+		if (!blockEscaped && /^\d+\.\s/.test(line)) {
 			const items: string[] = [];
 			while (i < lines.length && /^\d+\.\s/.test(lines[i])) {
 				const content = lines[i].replace(/^\d+\.\s+/, '');

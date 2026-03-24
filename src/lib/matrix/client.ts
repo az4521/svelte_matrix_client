@@ -56,6 +56,45 @@ export async function login(
 	};
 }
 
+export async function register(
+	homeserverUrl: string,
+	username: string,
+	password: string,
+	registrationToken?: string
+): Promise<{ userId: string; accessToken: string; deviceId: string; homeserverUrl: string }> {
+	const resolvedBase = await resolveHomeserver(homeserverUrl);
+	const tempClient = createClient({ baseUrl: resolvedBase });
+
+	const body: Record<string, unknown> = {
+		username,
+		password,
+		initial_device_display_name: 'Matrix Svelte Client',
+		inhibit_login: false,
+	};
+
+	if (registrationToken) {
+		body.auth = { type: 'm.login.registration_token', token: registrationToken };
+	}
+
+	const response = await tempClient.registerRequest(body);
+	const resolvedURL = tempClient.getHomeserverUrl();
+	tempClient.stopClient();
+
+	matrixClient = createClient({
+		baseUrl: resolvedURL,
+		accessToken: response.access_token,
+		userId: response.user_id,
+		deviceId: response.device_id,
+	});
+
+	return {
+		userId: response.user_id,
+		accessToken: response.access_token!,
+		deviceId: response.device_id!,
+		homeserverUrl: resolvedURL
+	};
+}
+
 export function reconnect(
 	homeserverUrl: string,
 	userId: string,
@@ -443,9 +482,11 @@ export function onRoomUpdate(callback: () => void): () => void {
 	if (!matrixClient) return () => {};
 	matrixClient.on('Room' as never, callback as never);
 	matrixClient.on('Room.name' as never, callback as never);
+	matrixClient.on(RoomMemberEvent.Membership as never, callback as never);
 	return () => {
 		matrixClient?.off('Room' as never, callback as never);
 		matrixClient?.off('Room.name' as never, callback as never);
+		matrixClient?.off(RoomMemberEvent.Membership as never, callback as never);
 	};
 }
 

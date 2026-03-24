@@ -1,15 +1,17 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { login, reconnect, startSync } from '$lib/matrix/client';
+	import { login, register, reconnect, startSync } from '$lib/matrix/client';
 	import { auth, saveSession, loadStoredSession } from '$lib/stores/auth.svelte';
 
 	let homeserverUrl = $state('https://matrix.crafty.moe');
 	let username = $state('');
 	let password = $state('');
+	let registrationToken = $state('');
 	let isLoading = $state(false);
 	let error = $state('');
 	let statusMsg = $state('');
+	let mode = $state<'login' | 'register'>('login');
 
 	onMount(() => {
 		// Try to restore a previous session
@@ -39,6 +41,29 @@
 		}
 	});
 
+	function afterAuth(result: { userId: string; accessToken: string; deviceId: string; homeserverUrl: string }) {
+		saveSession({
+			userId: result.userId,
+			accessToken: result.accessToken,
+			deviceId: result.deviceId,
+			homeserverUrl: result.homeserverUrl
+		});
+
+		statusMsg = 'Syncing…';
+		let navigated = false;
+		startSync((state) => {
+			auth.syncState = state;
+			if ((state === 'PREPARED' || state === 'SYNCING') && !navigated) {
+				navigated = true;
+				goto('/app');
+			} else if (state === 'ERROR') {
+				isLoading = false;
+				statusMsg = '';
+				error = 'Sync error. Check your connection.';
+			}
+		});
+	}
+
 	async function handleLogin() {
 		error = '';
 		statusMsg = '';
@@ -51,29 +76,29 @@
 
 			statusMsg = 'Logging in…';
 			const result = await login(url, username, password);
-
-			saveSession({
-				userId: result.userId,
-				accessToken: result.accessToken,
-				deviceId: result.deviceId,
-				homeserverUrl: result.homeserverUrl
-			});
-
-			statusMsg = 'Syncing…';
-			let navigated = false;
-			startSync((state) => {
-				auth.syncState = state;
-				if ((state === 'PREPARED' || state === 'SYNCING') && !navigated) {
-					navigated = true;
-					goto('/app');
-				} else if (state === 'ERROR') {
-					isLoading = false;
-					statusMsg = '';
-					error = 'Sync error. Check your connection.';
-				}
-			});
+			afterAuth(result);
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Login failed. Check your credentials.';
+			isLoading = false;
+			statusMsg = '';
+		}
+	}
+
+	async function handleRegister() {
+		error = '';
+		statusMsg = '';
+		isLoading = true;
+
+		try {
+			let url = homeserverUrl.trim();
+			if (!url.startsWith('http')) url = 'https://' + url;
+			url = url.replace(/\/$/, '');
+
+			statusMsg = 'Creating account…';
+			const result = await register(url, username, password, registrationToken || undefined);
+			afterAuth(result);
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Registration failed.';
 			isLoading = false;
 			statusMsg = '';
 		}
@@ -81,7 +106,7 @@
 </script>
 
 <svelte:head>
-	<title>Matrix Client — Sign In</title>
+	<title>Matrix Client — {mode === 'login' ? 'Sign In' : 'Register'}</title>
 </svelte:head>
 
 <div class="min-h-screen flex items-center justify-center bg-discord-backgroundTertiary p-4">
@@ -93,8 +118,13 @@
 				<div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-discord-accent mb-4">
 					<span class="text-3xl font-bold text-white">#</span>
 				</div>
-				<h1 class="text-2xl font-bold text-discord-textPrimary">Welcome back!</h1>
-				<p class="text-discord-textSecondary mt-1">Sign in to your Matrix account</p>
+				{#if mode === 'login'}
+					<h1 class="text-2xl font-bold text-discord-textPrimary">Welcome back!</h1>
+					<p class="text-discord-textSecondary mt-1">Sign in to your Matrix account</p>
+				{:else}
+					<h1 class="text-2xl font-bold text-discord-textPrimary">Create an account</h1>
+					<p class="text-discord-textSecondary mt-1">Register on a Matrix homeserver</p>
+				{/if}
 			</div>
 
 			<!-- Error banner -->
@@ -113,7 +143,7 @@
 			{/if}
 
 			<!-- Form -->
-			<form onsubmit={(e) => { e.preventDefault(); handleLogin(); }} class="space-y-4">
+			<form onsubmit={(e) => { e.preventDefault(); mode === 'login' ? handleLogin() : handleRegister(); }} class="space-y-4">
 				<!-- Homeserver -->
 				<div>
 					<label for="server" class="block text-xs font-semibold text-discord-textMuted uppercase tracking-wide mb-1.5">
@@ -139,7 +169,7 @@
 						id="username"
 						type="text"
 						bind:value={username}
-						placeholder="@you:matrix.crafty.moe"
+						placeholder={mode === 'login' ? '@you:matrix.crafty.moe' : 'yourusername'}
 						disabled={isLoading}
 						class="w-full px-3 py-2.5 bg-discord-backgroundSecondary text-discord-textPrimary placeholder-discord-textMuted rounded border border-discord-divider focus:border-discord-accent focus:outline-none transition-colors disabled:opacity-60 text-sm"
 						required
@@ -162,6 +192,23 @@
 					/>
 				</div>
 
+				<!-- Registration token (register mode only) -->
+				{#if mode === 'register'}
+					<div>
+						<label for="token" class="block text-xs font-semibold text-discord-textMuted uppercase tracking-wide mb-1.5">
+							Registration Token <span class="normal-case font-normal text-discord-textMuted">(if required)</span>
+						</label>
+						<input
+							id="token"
+							type="text"
+							bind:value={registrationToken}
+							placeholder="Leave blank if not required"
+							disabled={isLoading}
+							class="w-full px-3 py-2.5 bg-discord-backgroundSecondary text-discord-textPrimary placeholder-discord-textMuted rounded border border-discord-divider focus:border-discord-accent focus:outline-none transition-colors disabled:opacity-60 text-sm"
+						/>
+					</div>
+				{/if}
+
 				<button
 					type="submit"
 					disabled={isLoading || !username || !password}
@@ -172,13 +219,34 @@
 							<span class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
 							{statusMsg || 'Please wait…'}
 						</span>
-					{:else}
+					{:else if mode === 'login'}
 						Log In
+					{:else}
+						Create Account
 					{/if}
 				</button>
 			</form>
 
-			<p class="text-center text-xs text-discord-textMuted mt-6 leading-relaxed">
+			<!-- Toggle mode -->
+			<div class="mt-5 text-center">
+				{#if mode === 'login'}
+					<p class="text-sm text-discord-textMuted">
+						Don't have an account?
+						<button onclick={() => { mode = 'register'; error = ''; }} class="text-discord-accent hover:underline font-medium">
+							Register
+						</button>
+					</p>
+				{:else}
+					<p class="text-sm text-discord-textMuted">
+						Already have an account?
+						<button onclick={() => { mode = 'login'; error = ''; }} class="text-discord-accent hover:underline font-medium">
+							Sign in
+						</button>
+					</p>
+				{/if}
+			</div>
+
+			<p class="text-center text-xs text-discord-textMuted mt-4 leading-relaxed">
 				Your credentials are sent directly to your homeserver and never stored by this app beyond your device.
 			</p>
 		</div>
