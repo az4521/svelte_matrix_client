@@ -35,6 +35,35 @@
 	let loadingOlder = $state(false);
 	let replyToEvent = $state<MatrixEvent | null>(null);
 	let editRequestedEventId = $state<string | null>(null);
+	let isDragOver = $state(false);
+	let dragCounter = 0; // track enter/leave pairs to avoid flicker on child elements
+
+	function onDragEnter(e: DragEvent) {
+		if (!e.dataTransfer?.types.includes('Files')) return;
+		dragCounter++;
+		isDragOver = true;
+	}
+
+	function onDragLeave() {
+		dragCounter--;
+		if (dragCounter <= 0) { dragCounter = 0; isDragOver = false; }
+	}
+
+	function onDragOver(e: DragEvent) {
+		if (!e.dataTransfer?.types.includes('Files')) return;
+		e.preventDefault();
+		e.dataTransfer.dropEffect = 'copy';
+	}
+
+	function onDrop(e: DragEvent) {
+		e.preventDefault();
+		dragCounter = 0;
+		isDragOver = false;
+		const files = e.dataTransfer?.files;
+		if (files && files.length > 0) {
+			messageInputEl?.addFiles([...files]);
+		}
+	}
 
 	async function requestEditLastMessage() {
 		const editable = messages.filter(
@@ -230,7 +259,27 @@
 	}
 </script>
 
-<div class="flex flex-1 min-w-0 overflow-hidden">
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+	class="flex flex-1 min-w-0 overflow-hidden relative"
+	ondragenter={onDragEnter}
+	ondragleave={onDragLeave}
+	ondragover={onDragOver}
+	ondrop={onDrop}
+>
+	<!-- Drop overlay -->
+	{#if isDragOver}
+		<div class="absolute inset-0 z-50 pointer-events-none flex items-center justify-center">
+			<div class="absolute inset-2 rounded-xl border-2 border-dashed border-discord-accent bg-discord-accent/10"></div>
+			<div class="relative flex flex-col items-center gap-2 text-discord-accent">
+				<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+				</svg>
+				<p class="text-lg font-semibold">Drop to attach</p>
+			</div>
+		</div>
+	{/if}
+
 	<!-- Main chat area -->
 	<div class="flex-1 flex flex-col min-w-0 overflow-hidden">
 		<!-- Room header -->

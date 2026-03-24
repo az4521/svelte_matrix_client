@@ -1,6 +1,7 @@
 <script lang="ts">
+	import type { Room } from 'matrix-js-sdk';
 	import Avatar from '$lib/components/ui/Avatar.svelte';
-	import { getRoomAvatar, leaveRoom } from '$lib/matrix/client';
+	import { getRoomAvatar, leaveRoom, setSpaceLayout, type SpaceLayout } from '$lib/matrix/client';
 	import { roomsState, setActiveSpace } from '$lib/stores/rooms.svelte';
 
 	interface Props {
@@ -10,12 +11,288 @@
 
 	let { onHomeClick, onSettingsClick }: Props = $props();
 
-	let contextMenu = $state<{ spaceId: string; x: number; y: number } | null>(null);
+	type ContextMenu =
+		| { kind: 'space'; spaceId: string; folderId: string | null; x: number; y: number }
+		| { kind: 'folder'; folderId: string; x: number; y: number };
 
-	function openContextMenu(e: MouseEvent, spaceId: string) {
-		e.preventDefault();
-		contextMenu = { spaceId, x: e.clientX, y: e.clientY };
+	const FOLDER_COLORS = [
+		'#7289da', '#3ba55c', '#ed4245', '#faa61a',
+		'#eb459e', '#00b0f0', '#9475f5', '#23a559',
+	];
+
+	let contextMenu = $state<ContextMenu | null>(null);
+	let expandedFolders = $state(new Set<string>());
+	let colorPicker = $state<{ folderId: string } | null>(null);
+
+	// HSV color picker state
+	let cpHue = $state(0);  // 0–360
+	let cpSat = $state(1);  // 0–1
+	let cpVal = $state(1);  // 0–1
+	let svBoxEl = $state<HTMLElement | null>(null);
+	let hueSliderEl = $state<HTMLElement | null>(null);
+
+	const cpHex = $derived(hsvToHex(cpHue, cpSat, cpVal));
+
+	function hsvToHex(h: number, s: number, v: number): string {
+		const f = (n: number) => {
+			const k = (n + h / 60) % 6;
+			return v - v * s * Math.max(0, Math.min(k, 4 - k, 1));
+		};
+		const r = Math.round(f(5) * 255);
+		const g = Math.round(f(3) * 255);
+		const b = Math.round(f(1) * 255);
+		return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 	}
+
+	function hexToHsv(hex: string): [number, number, number] {
+		const r = parseInt(hex.slice(1, 3), 16) / 255;
+		const g = parseInt(hex.slice(3, 5), 16) / 255;
+		const b = parseInt(hex.slice(5, 7), 16) / 255;
+		const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+		const v = max;
+		const s = max === 0 ? 0 : d / max;
+		let hh = 0;
+		if (d !== 0) {
+			if (max === r) hh = ((g - b) / d + (g < b ? 6 : 0)) * 60;
+			else if (max === g) hh = ((b - r) / d + 2) * 60;
+			else hh = ((r - g) / d + 4) * 60;
+		}
+		return [hh, s, v];
+	}
+
+	function setHsvFromHex(hex: string) {
+		if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
+			[cpHue, cpSat, cpVal] = hexToHsv(hex);
+		}
+	}
+
+	function startSVDrag(e: MouseEvent) {
+		e.preventDefault();
+		updateSV(e);
+		const onMove = (ev: MouseEvent) => updateSV(ev);
+		const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+		document.addEventListener('mousemove', onMove);
+		document.addEventListener('mouseup', onUp);
+	}
+
+	function updateSV(e: MouseEvent) {
+		if (!svBoxEl) return;
+		const rect = svBoxEl.getBoundingClientRect();
+		cpSat = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+		cpVal = Math.max(0, Math.min(1, 1 - (e.clientY - rect.top) / rect.height));
+	}
+
+	function startHueDrag(e: MouseEvent) {
+		e.preventDefault();
+		updateHue(e);
+		const onMove = (ev: MouseEvent) => updateHue(ev);
+		const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+		document.addEventListener('mousemove', onMove);
+		document.addEventListener('mouseup', onUp);
+	}
+
+	function updateHue(e: MouseEvent) {
+		if (!hueSliderEl) return;
+		const rect = hueSliderEl.getBoundingClientRect();
+		cpHue = Math.max(0, Math.min(360, ((e.clientY - rect.top) / rect.height) * 360));
+	}
+
+	// Drag state
+	let dragState = $state<{ id: string; fromFolderId: string | null } | null>(null);
+	// id = root item id or folder-space id, position = where to drop relative to it
+	let dropTarget = $state<{ id: string; position: 'before' | 'after' | 'into' } | null>(null);
+
+	type RootItem =
+		| { kind: 'space'; id: string; space: Room }
+		| { kind: 'folder'; id: string; spaces: Room[] };
+
+	const rootItems = $derived.by((): RootItem[] => {
+		const { order, folders } = roomsState.spaceLayout;
+		const spacesInFolders = new Set(Object.values(folders).flatMap((f) => f.spaceIds));
+
+		if (!order.length) {
+			return roomsState.spaces.map((s) => ({ kind: 'space', id: s.roomId, space: s }));
+		}
+
+		const result: RootItem[] = [];
+		for (const id of order) {
+			if (folders[id]) {
+				const folderSpaces = folders[id].spaceIds
+					.map((sid) => roomsState.spaces.find((s) => s.roomId === sid))
+					.filter((s): s is Room => !!s);
+				result.push({ kind: 'folder', id, spaces: folderSpaces });
+			} else {
+				const space = roomsState.spaces.find((s) => s.roomId === id);
+				if (space) result.push({ kind: 'space', id, space });
+			}
+		}
+		for (const space of roomsState.spaces) {
+			if (!order.includes(space.roomId) && !spacesInFolders.has(space.roomId)) {
+				result.push({ kind: 'space', id: space.roomId, space });
+			}
+		}
+		return result;
+	});
+
+	const spaceFolderMap = $derived.by(() => {
+		const map = new Map<string, string>();
+		for (const [folderId, folder] of Object.entries(roomsState.spaceLayout.folders)) {
+			for (const spaceId of folder.spaceIds) {
+				map.set(spaceId, folderId);
+			}
+		}
+		return map;
+	});
+
+	function getLayout(): SpaceLayout {
+		return {
+			order: [...roomsState.spaceLayout.order],
+			folders: Object.fromEntries(
+				Object.entries(roomsState.spaceLayout.folders).map(([k, v]) => [
+					k,
+					{ ...v, spaceIds: [...v.spaceIds] }
+				])
+			)
+		};
+	}
+
+	function saveLayout(layout: SpaceLayout) {
+		// Dissolve any empty folders
+		for (const [folderId, folder] of Object.entries(layout.folders)) {
+			if (folder.spaceIds.length === 0) {
+				layout.order = layout.order.filter(id => id !== folderId);
+				delete layout.folders[folderId];
+			}
+		}
+		roomsState.spaceLayout = layout;
+		setSpaceLayout(layout).catch((err) => console.error('[setSpaceLayout] failed:', err));
+	}
+
+	function isDraggingSpace(): boolean {
+		if (!dragState) return false;
+		if (dragState.fromFolderId !== null) return true;
+		return !roomsState.spaceLayout.folders[dragState.id];
+	}
+
+	function calcPos(e: DragEvent, zones: 'two' | 'three'): 'before' | 'after' | 'into' {
+		const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+		const rel = (e.clientY - rect.top) / rect.height;
+		if (zones === 'three') return rel < 0.3 ? 'before' : rel > 0.7 ? 'after' : 'into';
+		return rel < 0.5 ? 'before' : 'after';
+	}
+
+	// --- Drag handlers ---
+
+	function onDragStart(e: DragEvent, id: string, fromFolderId: string | null) {
+		dragState = { id, fromFolderId };
+		e.dataTransfer!.effectAllowed = 'move';
+	}
+
+	function onRootItemDragOver(e: DragEvent, targetId: string, targetKind: 'space' | 'folder') {
+		e.preventDefault();
+		e.stopPropagation();
+		if (!dragState || dragState.id === targetId) return;
+
+		let position: 'before' | 'after' | 'into';
+		if (isDraggingSpace() && (targetKind === 'space' || targetKind === 'folder')) {
+			// Space onto space/folder: 3-zone (middle = merge/into)
+			position = calcPos(e, 'three');
+		} else {
+			// Folder onto anything: 2-zone (reorder only)
+			position = calcPos(e, 'two');
+		}
+		dropTarget = { id: targetId, position };
+	}
+
+	function onFolderSpaceDragOver(e: DragEvent, targetId: string) {
+		e.preventDefault();
+		e.stopPropagation();
+		if (!dragState || dragState.id === targetId) return;
+		dropTarget = { id: targetId, position: calcPos(e, 'two') };
+	}
+
+	function onDragEnd() {
+		dragState = null;
+		dropTarget = null;
+	}
+
+	function onDrop(e: DragEvent) {
+		e.preventDefault();
+		if (!dragState) { onDragEnd(); return; }
+
+		if (!dropTarget) {
+			// Dropped in empty space below items — move folder-space to root end
+			if (dragState.fromFolderId !== null) {
+				const layout = getLayout();
+				layout.folders[dragState.fromFolderId].spaceIds = layout.folders[dragState.fromFolderId].spaceIds.filter(id => id !== dragState!.id);
+				layout.order.push(dragState.id);
+				saveLayout(layout);
+			}
+			onDragEnd();
+			return;
+		}
+
+		const { id: fromId, fromFolderId } = dragState;
+		const { id: toId, position } = dropTarget;
+		if (fromId === toId) { onDragEnd(); return; }
+
+		const layout = getLayout();
+		const toFolderId = spaceFolderMap.get(toId) ?? null;
+		const toIsFolder = !!layout.folders[toId];
+
+		// Step 1: Remove fromId from its source
+		if (fromFolderId !== null) {
+			layout.folders[fromFolderId].spaceIds = layout.folders[fromFolderId].spaceIds.filter(id => id !== fromId);
+		} else {
+			layout.order = layout.order.filter(id => id !== fromId);
+		}
+
+		// Step 2: Insert at target
+		if (position === 'into') {
+			if (toIsFolder) {
+				// Add space to existing folder
+				if (!layout.folders[toId].spaceIds.includes(fromId)) {
+					layout.folders[toId].spaceIds.push(fromId);
+				}
+				expandedFolders = new Set([...expandedFolders, toId]);
+			} else {
+				// Merge two root spaces into a new folder
+				const toIndex = layout.order.indexOf(toId);
+				layout.order.splice(toIndex, 1);
+				const folderId = `folder_${Date.now()}`;
+				layout.order.splice(toIndex, 0, folderId);
+				layout.folders[folderId] = { name: '', spaceIds: [toId, fromId] };
+				expandedFolders = new Set([...expandedFolders, folderId]);
+			}
+		} else if (toFolderId !== null) {
+			// Insert before/after a folder-space (reorder within folder or move into folder)
+			const folderSpaces = layout.folders[toFolderId].spaceIds.filter(id => id !== fromId);
+			const toIndex = folderSpaces.indexOf(toId);
+			folderSpaces.splice(position === 'before' ? toIndex : toIndex + 1, 0, fromId);
+			layout.folders[toFolderId].spaceIds = folderSpaces;
+		} else {
+			// Insert before/after a root item
+			const toIndex = layout.order.indexOf(toId);
+			layout.order.splice(position === 'before' ? toIndex : toIndex + 1, 0, fromId);
+		}
+
+		saveLayout(layout);
+		onDragEnd();
+	}
+
+	// --- Context menu ---
+
+	function openSpaceContextMenu(e: MouseEvent, spaceId: string, folderId: string | null = null) {
+		e.preventDefault();
+		contextMenu = { kind: 'space', spaceId, folderId, x: e.clientX, y: e.clientY };
+	}
+
+	function openFolderContextMenu(e: MouseEvent, folderId: string) {
+		e.preventDefault();
+		contextMenu = { kind: 'folder', folderId, x: e.clientX, y: e.clientY };
+	}
+
+	// --- Actions ---
 
 	async function handleLeaveSpace(spaceId: string) {
 		contextMenu = null;
@@ -26,9 +303,83 @@
 			console.error('Failed to leave space:', err);
 		}
 	}
+
+	function handleNewFolder(spaceId: string) {
+		contextMenu = null;
+		const layout = getLayout();
+		for (const fid in layout.folders) {
+			layout.folders[fid].spaceIds = layout.folders[fid].spaceIds.filter(id => id !== spaceId);
+		}
+		const folderId = `folder_${Date.now()}`;
+		const spaceIndex = layout.order.indexOf(spaceId);
+		layout.order = layout.order.filter(id => id !== spaceId);
+		layout.order.splice(spaceIndex === -1 ? layout.order.length : spaceIndex, 0, folderId);
+		layout.folders[folderId] = { name: '', spaceIds: [spaceId] };
+		saveLayout(layout);
+		expandedFolders = new Set([...expandedFolders, folderId]);
+	}
+
+	function handleMoveToFolder(spaceId: string, targetFolderId: string) {
+		contextMenu = null;
+		const layout = getLayout();
+		layout.order = layout.order.filter(id => id !== spaceId);
+		for (const fid in layout.folders) {
+			layout.folders[fid].spaceIds = layout.folders[fid].spaceIds.filter(id => id !== spaceId);
+		}
+		layout.folders[targetFolderId].spaceIds.push(spaceId);
+		saveLayout(layout);
+	}
+
+	function handleRemoveFromFolder(spaceId: string, folderId: string) {
+		contextMenu = null;
+		const layout = getLayout();
+		layout.folders[folderId].spaceIds = layout.folders[folderId].spaceIds.filter(id => id !== spaceId);
+		const folderIndex = layout.order.indexOf(folderId);
+		layout.order.splice(folderIndex + 1, 0, spaceId);
+		saveLayout(layout);
+	}
+
+	function openColorPicker(folderId: string) {
+		contextMenu = null;
+		const current = roomsState.spaceLayout.folders[folderId]?.color ?? FOLDER_COLORS[0];
+		setHsvFromHex(current);
+		colorPicker = { folderId };
+	}
+
+	function commitColor() {
+		if (!colorPicker) return;
+		const layout = getLayout();
+		if (!layout.folders[colorPicker.folderId]) return;
+		layout.folders[colorPicker.folderId].color = cpHex;
+		colorPicker = null;
+		saveLayout(layout);
+	}
+
+	function handleDissolveFolder(folderId: string) {
+		contextMenu = null;
+		const layout = getLayout();
+		const spaceIds = layout.folders[folderId]?.spaceIds ?? [];
+		const folderIndex = layout.order.indexOf(folderId);
+		layout.order = layout.order.filter(id => id !== folderId);
+		layout.order.splice(folderIndex, 0, ...spaceIds);
+		delete layout.folders[folderId];
+		saveLayout(layout);
+	}
+
+	function toggleFolder(folderId: string) {
+		const next = new Set(expandedFolders);
+		if (next.has(folderId)) next.delete(folderId);
+		else next.add(folderId);
+		expandedFolders = next;
+	}
 </script>
 
-<nav class="w-[72px] bg-discord-backgroundTertiary flex flex-col items-center py-3 gap-2 overflow-y-auto scrollbar-hide flex-shrink-0">
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+<nav
+	class="w-[72px] bg-discord-backgroundTertiary flex flex-col items-center py-3 gap-2 overflow-y-auto scrollbar-hide flex-shrink-0"
+	ondragover={(e) => e.preventDefault()}
+	ondrop={onDrop}
+>
 	<!-- Home button -->
 	<button
 		onclick={onHomeClick}
@@ -52,40 +403,257 @@
 	<!-- Separator -->
 	<div class="w-8 h-px bg-discord-divider my-1 flex-shrink-0"></div>
 
-	<!-- Space icons -->
-	{#each roomsState.spaces as space (space.roomId)}
-		{@const isActive = roomsState.activeSpaceId === space.roomId}
-		{@const avatarSrc = getRoomAvatar(space)}
-		<button
-			onclick={() => setActiveSpace(space.roomId)}
-			oncontextmenu={(e) => openContextMenu(e, space.roomId)}
-			class="group relative w-12 h-12 flex items-center justify-center transition-all duration-200 flex-shrink-0"
-			title={space.name || space.roomId}
-		>
-			<Avatar src={avatarSrc} name={space.name || '?'} size={48} rounded="none" class="{isActive ? 'rounded-xl' : 'rounded-2xl group-hover:rounded-xl'} transition-all duration-200" />
-			{#if isActive}
-				<div class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 w-1 h-8 bg-white rounded-r-full"></div>
-			{:else}
-				<div class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 w-1 h-2 bg-white rounded-r-full opacity-0 group-hover:opacity-100 group-hover:h-5 transition-all duration-200"></div>
-			{/if}
-		</button>
+	<!-- Root items -->
+	{#each rootItems as item (item.id)}
+		{#if dropTarget?.id === item.id && dropTarget.position === 'before'}
+			<div class="w-10 h-0.5 bg-discord-accent rounded-full flex-shrink-0 -my-0.5 pointer-events-none"></div>
+		{/if}
+
+		{#if item.kind === 'space'}
+			{@const isActive = roomsState.activeSpaceId === item.space.roomId}
+			{@const avatarSrc = getRoomAvatar(item.space)}
+			{@const isMergeTarget = dropTarget?.id === item.id && dropTarget.position === 'into'}
+			<button
+				onclick={() => setActiveSpace(item.space.roomId)}
+				oncontextmenu={(e) => openSpaceContextMenu(e, item.space.roomId)}
+				draggable="true"
+				ondragstart={(e) => onDragStart(e, item.space.roomId, null)}
+				ondragover={(e) => onRootItemDragOver(e, item.id, 'space')}
+				ondragend={onDragEnd}
+				class="group relative w-12 h-12 flex items-center justify-center transition-all duration-200 flex-shrink-0"
+				class:opacity-40={dragState?.id === item.id}
+				class:ring-2={isMergeTarget}
+				class:ring-discord-accent={isMergeTarget}
+				class:rounded-xl={isMergeTarget}
+				title={item.space.name || item.space.roomId}
+			>
+				<Avatar src={avatarSrc} name={item.space.name || '?'} size={48} rounded="none" class="{isActive ? 'rounded-xl' : isMergeTarget ? 'rounded-xl' : 'rounded-2xl group-hover:rounded-xl'} transition-all duration-200" />
+				{#if isActive}
+					<div class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 w-1 h-8 bg-white rounded-r-full"></div>
+				{:else}
+					<div class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 w-1 h-2 bg-white rounded-r-full opacity-0 group-hover:opacity-100 group-hover:h-5 transition-all duration-200"></div>
+				{/if}
+			</button>
+		{:else}
+			{@const isExpanded = expandedFolders.has(item.id)}
+			{@const folderHasActive = item.spaces.some((s) => s.roomId === roomsState.activeSpaceId)}
+			{@const folderColor = roomsState.spaceLayout.folders[item.id]?.color}
+			{@const isIntoTarget = dropTarget?.id === item.id && dropTarget.position === 'into'}
+			<div
+				class="flex flex-col items-center gap-1 flex-shrink-0"
+				class:opacity-40={dragState?.id === item.id}
+			>
+				<button
+					onclick={() => toggleFolder(item.id)}
+					oncontextmenu={(e) => openFolderContextMenu(e, item.id)}
+					draggable="true"
+					ondragstart={(e) => onDragStart(e, item.id, null)}
+					ondragover={(e) => onRootItemDragOver(e, item.id, 'folder')}
+					ondragend={onDragEnd}
+					class="group relative w-12 h-12 flex items-center justify-center flex-shrink-0"
+					class:ring-2={isIntoTarget}
+					class:ring-discord-accent={isIntoTarget}
+					class:rounded-xl={isIntoTarget}
+				>
+					<div class="w-11 h-11 {isExpanded || isIntoTarget ? 'rounded-xl' : 'rounded-2xl'} group-hover:rounded-xl overflow-hidden transition-all duration-200"
+						style="display: grid; grid-template-columns: repeat({Math.min(item.spaces.length, 2)}, 1fr); grid-template-rows: repeat({item.spaces.length > 2 ? 2 : 1}, 1fr); gap: 2px; padding: 6px; background-color: {folderColor ?? 'var(--discord-backgroundSecondary)'};"
+					>
+						{#each item.spaces.slice(0, 4) as space}
+							<div class="rounded-sm overflow-hidden">
+								<Avatar src={getRoomAvatar(space)} name={space.name || '?'} size={16} rounded="none" class="w-full h-full" />
+							</div>
+						{/each}
+						{#if item.spaces.length === 0}
+							<div style="grid-column: span 2; grid-row: span 2;" class="flex items-center justify-center">
+								<svg class="w-4 h-4 text-discord-textMuted" fill="currentColor" viewBox="0 0 24 24">
+									<path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+								</svg>
+							</div>
+						{/if}
+					</div>
+					{#if folderHasActive && !isExpanded}
+						<div class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 w-1 h-8 bg-white rounded-r-full"></div>
+					{:else if !isExpanded}
+						<div class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 w-1 h-2 bg-white rounded-r-full opacity-0 group-hover:opacity-100 group-hover:h-5 transition-all duration-200"></div>
+					{/if}
+				</button>
+
+				{#if isExpanded}
+					<div class="flex flex-col items-center gap-1 bg-discord-backgroundSecondary/50 rounded-xl px-1 py-1 w-12">
+						{#each item.spaces as space (space.roomId)}
+							{#if dropTarget?.id === space.roomId && dropTarget.position === 'before'}
+								<div class="w-8 h-0.5 bg-discord-accent rounded-full pointer-events-none -my-0.5"></div>
+							{/if}
+							{@const isActive = roomsState.activeSpaceId === space.roomId}
+							<button
+								onclick={() => setActiveSpace(space.roomId)}
+								oncontextmenu={(e) => openSpaceContextMenu(e, space.roomId, item.id)}
+								draggable="true"
+								ondragstart={(e) => onDragStart(e, space.roomId, item.id)}
+								ondragover={(e) => onFolderSpaceDragOver(e, space.roomId)}
+								ondragend={onDragEnd}
+								class="group relative w-9 h-9 flex items-center justify-center transition-all duration-200 flex-shrink-0"
+								class:opacity-40={dragState?.id === space.roomId}
+								title={space.name || space.roomId}
+							>
+								<Avatar src={getRoomAvatar(space)} name={space.name || '?'} size={36} rounded="none" class="{isActive ? 'rounded-lg' : 'rounded-2xl group-hover:rounded-lg'} transition-all duration-200" />
+								{#if isActive}
+									<div class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 w-1 h-6 bg-white rounded-r-full"></div>
+								{:else}
+									<div class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 w-1 h-2 bg-white rounded-r-full opacity-0 group-hover:opacity-100 group-hover:h-4 transition-all duration-200"></div>
+								{/if}
+							</button>
+							{#if dropTarget?.id === space.roomId && dropTarget.position === 'after'}
+								<div class="w-8 h-0.5 bg-discord-accent rounded-full pointer-events-none -my-0.5"></div>
+							{/if}
+						{/each}
+					</div>
+
+					{/if}
+			</div>
+		{/if}
+
+		{#if dropTarget?.id === item.id && dropTarget.position === 'after'}
+			<div class="w-10 h-0.5 bg-discord-accent rounded-full flex-shrink-0 -my-0.5 pointer-events-none"></div>
+		{/if}
 	{/each}
 
 	{#if roomsState.spaces.length > 0}
 		<div class="w-8 h-px bg-discord-divider my-1 flex-shrink-0"></div>
 	{/if}
 
+	<!-- Context menu -->
 	{#if contextMenu}
-		<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div class="fixed inset-0 z-50" onclick={() => contextMenu = null}></div>
 		<div
-			class="fixed z-50 bg-discord-backgroundTertiary border border-discord-divider rounded-lg shadow-xl py-1 min-w-36"
+			class="fixed z-50 bg-discord-backgroundTertiary border border-discord-divider rounded-lg shadow-xl py-1 min-w-40"
 			style="left: {contextMenu.x}px; top: {contextMenu.y}px"
 		>
-			<button
-				onclick={() => handleLeaveSpace(contextMenu!.spaceId)}
-				class="w-full text-left px-3 py-1.5 text-sm text-discord-danger hover:bg-discord-danger hover:text-white transition-colors"
-			>Leave Space</button>
+			{#if contextMenu.kind === 'space'}
+				{@const cm = contextMenu}
+				{@const folders = Object.entries(roomsState.spaceLayout.folders)}
+				{#if cm.folderId}
+					<button
+						onclick={() => handleRemoveFromFolder(cm.spaceId, cm.folderId!)}
+						class="w-full text-left px-3 py-1.5 text-sm text-discord-textSecondary hover:bg-discord-messageHover hover:text-discord-textPrimary transition-colors"
+					>Remove from folder</button>
+					<div class="w-full h-px bg-discord-divider my-1"></div>
+				{:else}
+					<button
+						onclick={() => handleNewFolder(cm.spaceId)}
+						class="w-full text-left px-3 py-1.5 text-sm text-discord-textSecondary hover:bg-discord-messageHover hover:text-discord-textPrimary transition-colors"
+					>New Folder</button>
+					{#if folders.length > 0}
+						<div class="w-full h-px bg-discord-divider my-1"></div>
+						<p class="px-3 py-1 text-xs text-discord-textMuted uppercase font-semibold tracking-wide">Move to folder</p>
+						{#each folders as [folderId, folder]}
+							<button
+								onclick={() => handleMoveToFolder(cm.spaceId, folderId)}
+								class="w-full text-left px-3 py-1.5 text-sm text-discord-textSecondary hover:bg-discord-messageHover hover:text-discord-textPrimary transition-colors truncate"
+							>{folder.name}</button>
+						{/each}
+						<div class="w-full h-px bg-discord-divider my-1"></div>
+					{/if}
+				{/if}
+				<button
+					onclick={() => handleLeaveSpace(cm.spaceId)}
+					class="w-full text-left px-3 py-1.5 text-sm text-discord-danger hover:bg-discord-danger hover:text-white transition-colors"
+				>Leave Space</button>
+			{:else if contextMenu.kind === 'folder'}
+				{@const cm = contextMenu}
+				<button
+					onclick={() => openColorPicker(cm.folderId)}
+					class="w-full text-left px-3 py-1.5 text-sm text-discord-textSecondary hover:bg-discord-messageHover hover:text-discord-textPrimary transition-colors"
+				>Set Color</button>
+				<div class="w-full h-px bg-discord-divider my-1"></div>
+				<button
+					onclick={() => handleDissolveFolder(cm.folderId)}
+					class="w-full text-left px-3 py-1.5 text-sm text-discord-danger hover:bg-discord-danger hover:text-white transition-colors"
+				>Dissolve Folder</button>
+			{/if}
+		</div>
+	{/if}
+
+	<!-- Color picker dialog -->
+	{#if colorPicker}
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onclick={(e) => { if (e.target === e.currentTarget) colorPicker = null; }}>
+			<div class="bg-discord-backgroundSecondary rounded-xl shadow-2xl p-4 flex flex-col gap-3" style="width: 240px;">
+				<p class="text-sm font-semibold text-discord-textPrimary">Folder Color</p>
+
+				<!-- SV box + hue slider -->
+				<div class="flex gap-2" style="height: 148px;">
+					<!-- Saturation/Value gradient box -->
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div
+						bind:this={svBoxEl}
+						class="relative flex-1 rounded-lg overflow-hidden cursor-crosshair select-none"
+						style="background: linear-gradient(to right, white, hsl({cpHue}, 100%, 50%));"
+						onmousedown={startSVDrag}
+					>
+						<!-- Black-to-transparent overlay -->
+						<div class="absolute inset-0" style="background: linear-gradient(to bottom, transparent, black);"></div>
+						<!-- Cursor -->
+						<div
+							class="absolute w-3 h-3 rounded-full border-2 border-white shadow pointer-events-none -translate-x-1/2 -translate-y-1/2"
+							style="left: {cpSat * 100}%; top: {(1 - cpVal) * 100}%; box-shadow: 0 0 0 1px rgba(0,0,0,0.4);"
+						></div>
+					</div>
+
+					<!-- Hue slider -->
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div
+						bind:this={hueSliderEl}
+						class="relative w-4 rounded-lg overflow-hidden cursor-ns-resize select-none flex-shrink-0"
+						style="background: linear-gradient(to bottom, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);"
+						onmousedown={startHueDrag}
+					>
+						<!-- Cursor bar -->
+						<div
+							class="absolute left-0 right-0 h-1 -translate-y-1/2 pointer-events-none rounded-sm"
+							style="top: {(cpHue / 360) * 100}%; box-shadow: 0 0 0 1.5px white, 0 0 0 2.5px rgba(0,0,0,0.5);"
+						></div>
+					</div>
+				</div>
+
+				<!-- Presets -->
+				<div class="flex gap-1.5">
+					{#each FOLDER_COLORS as color}
+						<!-- svelte-ignore a11y_consider_explicit_label -->
+						<button
+							onclick={() => setHsvFromHex(color)}
+							class="flex-1 h-5 rounded transition-all duration-100"
+							style="background-color: {color}; outline: {Math.abs(cpHue - hexToHsv(color)[0]) < 2 && Math.abs(cpSat - hexToHsv(color)[1]) < 0.05 && Math.abs(cpVal - hexToHsv(color)[2]) < 0.05 ? '2px solid white' : 'none'};"
+						></button>
+					{/each}
+				</div>
+
+				<!-- Hex input -->
+				<div class="flex items-center gap-2">
+					<div class="w-7 h-7 rounded flex-shrink-0" style="background-color: {cpHex};"></div>
+					<input
+						class="flex-1 bg-discord-backgroundTertiary text-discord-textPrimary text-sm font-mono px-2 py-1.5 rounded outline-none border border-discord-divider focus:border-discord-accent uppercase tracking-wider"
+						value={cpHex}
+						maxlength={7}
+						oninput={(e) => setHsvFromHex((e.target as HTMLInputElement).value)}
+					/>
+				</div>
+
+				<!-- Actions -->
+				<div class="flex gap-2">
+					<button
+						onclick={commitColor}
+						class="flex-1 py-1.5 rounded text-sm font-semibold bg-discord-accent hover:bg-discord-accentHover text-white transition-colors"
+					>Save</button>
+					<button
+						onclick={() => colorPicker = null}
+						class="flex-1 py-1.5 rounded text-sm font-semibold bg-discord-backgroundTertiary hover:bg-discord-messageHover text-discord-textPrimary transition-colors"
+					>Cancel</button>
+				</div>
+			</div>
 		</div>
 	{/if}
 

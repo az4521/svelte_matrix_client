@@ -15,10 +15,12 @@
 		getDirectRooms,
 		getRoomsInSpace,
 		getInvitedRooms,
+		getSpaceLayout,
 		fetchSpaceHierarchy,
 		getRoom,
 		logout,
-		onRoomUpdate
+		onRoomUpdate,
+		onAccountData
 	} from '$lib/matrix/client';
 
 	let showSettings = $state(false);
@@ -31,7 +33,26 @@
 	});
 
 	function refreshRooms() {
-		roomsState.spaces = getSpaces();
+		const layout = getSpaceLayout();
+		roomsState.spaceLayout = layout;
+		const spaces = getSpaces();
+		if (layout.order.length) {
+			// Build a flat ordered list of all space IDs (including those inside folders)
+			const allIds: string[] = [];
+			for (const id of layout.order) {
+				if (layout.folders[id]) {
+					allIds.push(...layout.folders[id].spaceIds);
+				} else {
+					allIds.push(id);
+				}
+			}
+			spaces.sort((a, b) => {
+				const ai = allIds.indexOf(a.roomId);
+				const bi = allIds.indexOf(b.roomId);
+				return (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi);
+			});
+		}
+		roomsState.spaces = spaces;
 		roomsState.orphanRooms = getOrphanRooms();
 		roomsState.directRooms = getDirectRooms();
 		roomsState.invitedRooms = getInvitedRooms();
@@ -51,7 +72,10 @@
 
 		const unsubRooms = onRoomUpdate(() => refreshRooms());
 		const unsubFavourites = initFavourites();
-		return () => { unsubRooms(); unsubFavourites(); };
+		const unsubAccountData = onAccountData((type) => {
+			if (type === 'im.client.space_layout' || type === 'im.client.space_order') refreshRooms();
+		});
+		return () => { unsubRooms(); unsubFavourites(); unsubAccountData(); };
 	});
 
 	// Update rooms list and fetch full hierarchy when selected space changes

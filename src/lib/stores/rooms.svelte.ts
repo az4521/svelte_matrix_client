@@ -1,5 +1,5 @@
 import type { Room } from 'matrix-js-sdk';
-import type { SpaceChildInfo } from '$lib/matrix/client';
+import type { SpaceChildInfo, SpaceLayout } from '$lib/matrix/client';
 
 const STORAGE_KEY = 'matrix_last_room_by_space';
 const SPACE_KEY = 'matrix_last_space';
@@ -47,7 +47,8 @@ export const roomsState = $state({
 	hierarchyLoading: false,
 	isLoading: false,
 	unreadTick: 0,
-	roomsTick: 0
+	roomsTick: 0,
+	spaceLayout: { order: [], folders: {} } as SpaceLayout
 });
 
 export function bumpUnreadTick(): void {

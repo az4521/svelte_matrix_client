@@ -53,6 +53,10 @@
 	export function focus() {
 		textareaEl?.focus();
 	}
+
+	export function addFiles(files: File[]) {
+		for (const file of files) enqueueFile(file);
+	}
 	let showEmojiPicker = $state(false);
 	let showStickerPicker = $state(false);
 	let showGifPicker = $state(false);

@@ -554,6 +554,43 @@ export async function fetchSpaceHierarchy(spaceId: string): Promise<SpaceChildIn
 	}
 }
 
+const SPACE_ORDER_KEY = 'im.client.space_order';
+const SPACE_LAYOUT_KEY = 'im.client.space_layout';
+
+export interface SpaceFolder {
+	name: string;
+	spaceIds: string[];
+	color?: string;
+}
+
+export interface SpaceLayout {
+	order: string[]; // space IDs and folder IDs mixed
+	folders: Record<string, SpaceFolder>;
+}
+
+export function getSpaceLayout(): SpaceLayout {
+	if (!matrixClient) return { order: [], folders: {} };
+	const layout = matrixClient.getAccountData(SPACE_LAYOUT_KEY)?.getContent() as SpaceLayout | undefined;
+	if (layout?.order?.length) return layout;
+	// Migrate from old space_order key
+	const oldOrder = (matrixClient.getAccountData(SPACE_ORDER_KEY)?.getContent()?.order as string[]) ?? [];
+	return { order: oldOrder, folders: {} };
+}
+
+export async function setSpaceLayout(layout: SpaceLayout): Promise<void> {
+	if (!matrixClient) throw new Error('Not logged in');
+	await matrixClient.setAccountData(SPACE_LAYOUT_KEY, layout);
+}
+
+export function getSpaceOrder(): string[] {
+	return getSpaceLayout().order;
+}
+
+export async function setSpaceOrder(order: string[]): Promise<void> {
+	const layout = getSpaceLayout();
+	await setSpaceLayout({ ...layout, order });
+}
+
 export async function leaveRoom(roomId: string): Promise<void> {
 	if (!matrixClient) throw new Error('Not logged in');
 	await matrixClient.leave(roomId);
@@ -729,7 +766,7 @@ function getUserPackImages(kind: ImageUsage): CustomEmoji[] {
 }
 
 // Returns custom emoji packs (emoticons only): user pack first, then active space.
-export function getCustomEmojiPacks(activeSpaceId: string | null, spaces: Room[]): CustomEmojiPack[] {
+export function getCustomEmojiPacks(activeSpaceId: string | null, _spaces: Room[]): CustomEmojiPack[] {
 	if (!matrixClient) return [];
 	const packs: CustomEmojiPack[] = [];
 
