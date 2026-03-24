@@ -28,6 +28,19 @@
 	let { event, room, showHeader, onReply, editRequested = false, onEditDone }: Props = $props();
 
 	let showEmojiPicker = $state(false);
+	let emojiPickerEl: HTMLDivElement | undefined = $state();
+
+	$effect(() => {
+		if (showEmojiPicker && !mobileState.isMobile) {
+			const handler = (e: MouseEvent) => {
+				if (emojiPickerEl && !emojiPickerEl.contains(e.target as Node)) {
+					showEmojiPicker = false;
+				}
+			};
+			document.addEventListener('mousedown', handler);
+			return () => document.removeEventListener('mousedown', handler);
+		}
+	});
 	let confirmingDelete = $state(false);
 
 	let keyboardOffset = $state(0);
@@ -317,7 +330,7 @@
 {#if showEmojiPicker}
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<div class="fixed inset-0 z-40" onclick={() => { showEmojiPicker = false; mobileState.selectedMessageId = null; }}></div>
+	{#if mobileState.isMobile}<div class="fixed inset-0 z-40" onclick={() => { showEmojiPicker = false; mobileState.selectedMessageId = null; }}></div>{/if}
 	{#if mobileState.isMobile}
 		<div class="fixed left-0 right-0 z-50" style="bottom: {keyboardOffset}px;">
 			<EmojiPicker
@@ -587,7 +600,7 @@
 				</svg>
 			</button>
 			{#if showEmojiPicker && !mobileState.isMobile}
-				<div class={emojiPickerBelow ? 'absolute top-full right-0 mt-1 z-50' : 'absolute bottom-full right-0 mb-1 z-50'}>
+				<div bind:this={emojiPickerEl} class={emojiPickerBelow ? 'absolute top-full right-0 mt-1 z-50' : 'absolute bottom-full right-0 mb-1 z-50'}>
 					<EmojiPicker
 						onSelect={async (emoji) => {
 							await sendReaction(room.roomId, eventId, emoji);
