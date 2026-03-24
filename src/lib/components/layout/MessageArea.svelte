@@ -235,9 +235,7 @@
 	<div class="flex-1 flex flex-col min-w-0 overflow-hidden">
 		<!-- Room header -->
 		<div class="h-12 px-4 flex items-center gap-3 border-b border-discord-divider shadow-sm flex-shrink-0">
-			<svg class="w-6 h-6 text-discord-textMuted flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
-				<path d="M5.88 2.39a1 1 0 1 0-1.94.49l.64 2.51A.85.85 0 0 1 3.72 6.5H2a1 1 0 0 0 0 2h1.27l-.63 2.47a1 1 0 1 0 1.94.49L5.5 8.5H9l-.63 2.47a1 1 0 1 0 1.94.49L11.24 8.5H13a1 1 0 0 0 0-2h-1.27l.7-2.73a1 1 0 0 0-1.94-.49L9.58 6.5H6.5l-.62-2.11z"/>
-			</svg>
+			<span class="text-xl font-bold text-discord-textMuted flex-shrink-0">#</span>
 			<h2 class="font-semibold text-discord-textPrimary">{roomName}</h2>
 			{#if topic}
 				<div class="w-px h-5 bg-discord-divider"></div>
@@ -272,9 +270,7 @@
 			{#if messages.length === 0}
 				<div class="px-4 pb-4">
 					<div class="w-16 h-16 rounded-full bg-discord-accent flex items-center justify-center mb-4">
-						<svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-							<path d="M5.88 2.39a1 1 0 1 0-1.94.49l.64 2.51A.85.85 0 0 1 3.72 6.5H2a1 1 0 0 0 0 2h1.27l-.63 2.47a1 1 0 1 0 1.94.49L5.5 8.5H9l-.63 2.47a1 1 0 1 0 1.94.49L11.24 8.5H13a1 1 0 0 0 0-2h-1.27l.7-2.73a1 1 0 0 0-1.94-.49L9.58 6.5H6.5l-.62-2.11z"/>
-						</svg>
+						<span class="text-3xl font-bold text-white">#</span>
 					</div>
 					<h3 class="text-2xl font-bold text-discord-textPrimary mb-1">Welcome to #{roomName}!</h3>
 					<p class="text-discord-textMuted">This is the beginning of the #{roomName} room.</p>

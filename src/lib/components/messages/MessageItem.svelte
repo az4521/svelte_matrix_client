@@ -432,7 +432,7 @@
 			{:else}
 				<div
 					use:spoilers
-					class="text-sm text-discord-textPrimary leading-relaxed break-words"
+					class="message-body text-sm text-discord-textPrimary leading-relaxed break-words"
 					class:emoji-only={emojiOnly}
 				>
 					{#if formattedBody()}

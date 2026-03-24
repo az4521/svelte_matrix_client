@@ -114,6 +114,15 @@ body {
   animation: fadeIn 0.2s ease-out;
 }
 
+/* Links inside message content */
+.message-body a {
+  color: var(--discord-accent);
+}
+.message-body a:hover {
+  color: var(--discord-accent-hover);
+  text-decoration: underline;
+}
+
 /* Focus styles */
 :focus-visible {
   outline: 2px solid var(--discord-accent);

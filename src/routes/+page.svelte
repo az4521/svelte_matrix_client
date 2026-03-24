@@ -91,9 +91,7 @@
 			<!-- Header -->
 			<div class="text-center mb-8">
 				<div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-discord-accent mb-4">
-					<svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-						<path d="M5.88 2.39a1 1 0 1 0-1.94.49l.64 2.51A.85.85 0 0 1 3.72 6.5H2a1 1 0 0 0 0 2h1.27l-.63 2.47a1 1 0 1 0 1.94.49L5.5 8.5H9l-.63 2.47a1 1 0 1 0 1.94.49L11.24 8.5H13a1 1 0 0 0 0-2h-1.27l.7-2.73a1 1 0 0 0-1.94-.49L9.58 6.5H6.5l-.62-2.11z"/>
-					</svg>
+					<span class="text-3xl font-bold text-white">#</span>
 				</div>
 				<h1 class="text-2xl font-bold text-discord-textPrimary">Welcome back!</h1>
 				<p class="text-discord-textSecondary mt-1">Sign in to your Matrix account</p>
