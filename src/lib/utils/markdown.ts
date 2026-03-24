@@ -21,10 +21,14 @@ function escapeHtml(s: string): string {
 }
 
 function processInline(raw: string): { html: string; changed: boolean } {
-	// Pull code spans out first so their content is never processed
+	// Pull code spans and URLs out first so their content is never processed
 	const spans: string[] = [];
 	let s = raw.replace(/`([^`\n]+)`/g, (_, code) => {
 		spans.push(`<code>${escapeHtml(code)}</code>`);
+		return `\x02${spans.length - 1}\x03`;
+	});
+	s = s.replace(/https?:\/\/[^\s<>)"']*/g, (url) => {
+		spans.push(`<a href="${escapeHtml(url)}">${escapeHtml(url)}</a>`);
 		return `\x02${spans.length - 1}\x03`;
 	});
 	const hadSpans = spans.length > 0;
