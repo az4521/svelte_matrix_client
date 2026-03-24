@@ -871,6 +871,170 @@ export function getCustomEmojis(room?: Room, activeSpaceId?: string | null): Cus
 	return result;
 }
 
+// ── Admin / moderation helpers ────────────────────────────────────────────────
+
+export function getMyPowerLevel(room: Room): number {
+	const me = matrixClient?.getUserId();
+	if (!me) return 0;
+	return room.getMember(me)?.powerLevel ?? 0;
+}
+
+export interface PowerLevels {
+	ban: number;
+	kick: number;
+	redact: number;
+	invite: number;
+	events_default: number;
+	state_default: number;
+	users_default: number;
+	events: Record<string, number>;
+	users: Record<string, number>;
+}
+
+export function getRoomPowerLevels(room: Room): PowerLevels {
+	const state = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
+	const content = state?.getStateEvents('m.room.power_levels', '')?.getContent() ?? {};
+	return {
+		ban: (content.ban as number) ?? 50,
+		kick: (content.kick as number) ?? 50,
+		redact: (content.redact as number) ?? 50,
+		invite: (content.invite as number) ?? 50,
+		events_default: (content.events_default as number) ?? 0,
+		state_default: (content.state_default as number) ?? 50,
+		users_default: (content.users_default as number) ?? 0,
+		events: (content.events as Record<string, number>) ?? {},
+		users: (content.users as Record<string, number>) ?? {},
+	};
+}
+
+export async function setRoomPowerLevels(room: Room, updated: Partial<PowerLevels>): Promise<void> {
+	if (!matrixClient) throw new Error('Not logged in');
+	const state = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
+	const current = state?.getStateEvents('m.room.power_levels', '')?.getContent() ?? {};
+	await (matrixClient as any).sendStateEvent(room.roomId, 'm.room.power_levels', { ...current, ...updated });
+}
+
+export async function setUserPowerLevel(room: Room, userId: string, level: number): Promise<void> {
+	if (!matrixClient) throw new Error('Not logged in');
+	const pl = getRoomPowerLevels(room);
+	await setRoomPowerLevels(room, { users: { ...pl.users, [userId]: level } });
+}
+
+export async function kickUser(roomId: string, userId: string, reason?: string): Promise<void> {
+	if (!matrixClient) throw new Error('Not logged in');
+	await matrixClient.kick(roomId, userId, reason);
+}
+
+export async function banUser(roomId: string, userId: string, reason?: string): Promise<void> {
+	if (!matrixClient) throw new Error('Not logged in');
+	await matrixClient.ban(roomId, userId, reason);
+}
+
+export async function unbanUser(roomId: string, userId: string): Promise<void> {
+	if (!matrixClient) throw new Error('Not logged in');
+	await matrixClient.unban(roomId, userId);
+}
+
+export function getBannedMembers(room: Room): RoomMember[] {
+	return room.getMembers().filter((m) => m.membership === 'ban');
+}
+
+export async function setRoomName(roomId: string, name: string): Promise<void> {
+	if (!matrixClient) throw new Error('Not logged in');
+	await matrixClient.setRoomName(roomId, name);
+}
+
+export async function setRoomTopic(roomId: string, topic: string): Promise<void> {
+	if (!matrixClient) throw new Error('Not logged in');
+	await matrixClient.setRoomTopic(roomId, topic);
+}
+
+export async function uploadContent(file: File): Promise<string> {
+	if (!matrixClient) throw new Error('Not logged in');
+	const { content_uri } = await matrixClient.uploadContent(file, { name: file.name });
+	return content_uri;
+}
+
+export async function setRoomAvatar(roomId: string, mxcUrl: string): Promise<void> {
+	if (!matrixClient) throw new Error('Not logged in');
+	await (matrixClient as any).sendStateEvent(roomId, 'm.room.avatar', { url: mxcUrl });
+}
+
+export function getJoinRule(room: Room): string {
+	const state = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
+	return state?.getStateEvents('m.room.join_rules', '')?.getContent()?.join_rule ?? 'invite';
+}
+
+export async function setJoinRule(roomId: string, rule: string): Promise<void> {
+	if (!matrixClient) throw new Error('Not logged in');
+	await (matrixClient as any).sendStateEvent(roomId, 'm.room.join_rules', { join_rule: rule });
+}
+
+export function getHistoryVisibility(room: Room): string {
+	const state = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
+	return state?.getStateEvents('m.room.history_visibility', '')?.getContent()?.history_visibility ?? 'shared';
+}
+
+export async function setHistoryVisibility(roomId: string, visibility: string): Promise<void> {
+	if (!matrixClient) throw new Error('Not logged in');
+	await (matrixClient as any).sendStateEvent(roomId, 'm.room.history_visibility', { history_visibility: visibility });
+}
+
+export interface SpaceChildEntry {
+	roomId: string;
+	name: string;
+	order: string;
+	via: string[];
+	avatarUrl: string | null;
+	isJoined: boolean;
+}
+
+export function getSpaceChildren(room: Room): SpaceChildEntry[] {
+	if (!matrixClient) return [];
+	const state = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
+	const childEvents = state?.getStateEvents('m.space.child') ?? [];
+	const joined = new Set(matrixClient.getRooms().map((r) => r.roomId));
+	return (childEvents as MatrixEvent[])
+		.filter((ev) => (ev.getContent()?.via as string[])?.length)
+		.map((ev) => {
+			const childId = ev.getStateKey()!;
+			const child = matrixClient!.getRoom(childId);
+			return {
+				roomId: childId,
+				name: child ? getRoomDisplayName(child) : childId,
+				order: (ev.getContent()?.order as string) ?? '',
+				via: (ev.getContent()?.via as string[]) ?? [],
+				avatarUrl: child ? getRoomAvatar(child) : null,
+				isJoined: joined.has(childId),
+			};
+		})
+		.sort((a, b) => {
+			if (a.order && b.order) return a.order.localeCompare(b.order);
+			if (a.order) return -1;
+			if (b.order) return 1;
+			return a.name.localeCompare(b.name);
+		});
+}
+
+export async function setSpaceChildOrder(spaceId: string, childRoomId: string, order: string, via: string[]): Promise<void> {
+	if (!matrixClient) throw new Error('Not logged in');
+	const existing = matrixClient.getRoom(spaceId)
+		?.getLiveTimeline().getState(EventTimeline.FORWARDS)
+		?.getStateEvents('m.space.child', childRoomId)?.getContent() ?? {};
+	await (matrixClient as any).sendStateEvent(spaceId, 'm.space.child', {
+		...existing,
+		via,
+		order: order || undefined,
+	}, childRoomId);
+}
+
+export async function removeSpaceChild(spaceId: string, childRoomId: string): Promise<void> {
+	if (!matrixClient) throw new Error('Not logged in');
+	await (matrixClient as any).sendStateEvent(spaceId, 'm.space.child', {}, childRoomId);
+}
+
+// ── End admin helpers ─────────────────────────────────────────────────────────
+
 export async function sendSticker(roomId: string, sticker: CustomSticker): Promise<void> {
 	if (!matrixClient) throw new Error('Not connected');
 	await matrixClient.sendEvent(roomId, 'm.sticker' as any, {

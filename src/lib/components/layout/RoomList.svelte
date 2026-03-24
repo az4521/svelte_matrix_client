@@ -1,9 +1,10 @@
 <script lang="ts">
 	import type { Room } from 'matrix-js-sdk';
 	import Avatar from '$lib/components/ui/Avatar.svelte';
-	import { getRoomAvatar, getRoomDisplayName, getUnreadCount, joinRoom, leaveRoom, acceptInvite, rejectInvite, getInviteSender } from '$lib/matrix/client';
+	import { getRoomAvatar, getRoomDisplayName, getUnreadCount, joinRoom, leaveRoom, acceptInvite, rejectInvite, getInviteSender, getMyPowerLevel, getRoomPowerLevels, getRoom, getRoomsInSpace } from '$lib/matrix/client';
 	import { roomsState, setActiveRoom, setActiveSpace } from '$lib/stores/rooms.svelte';
 	import { auth } from '$lib/stores/auth.svelte';
+	import RoomSettings from '$lib/components/layout/RoomSettings.svelte';
 
 	interface Props {
 		onLogout: () => void;
@@ -126,6 +127,19 @@
 		}
 	}
 
+	let showSpaceSettings = $state(false);
+
+	const activeSpaceRoom = $derived(
+		roomsState.activeSpaceId ? getRoom(roomsState.activeSpaceId) : null
+	);
+
+	const canAccessSpaceSettings = $derived.by(() => {
+		if (!activeSpaceRoom) return false;
+		const myPl = getMyPowerLevel(activeSpaceRoom);
+		const pl = getRoomPowerLevels(activeSpaceRoom);
+		return myPl >= pl.state_default || myPl >= pl.kick || myPl >= pl.ban;
+	});
+
 	function roomButton(room: Room) {
 		const isActive = roomsState.activeRoomId === room.roomId;
 		roomsState.unreadTick; // track read receipt / new message changes
@@ -136,10 +150,21 @@
 
 <div class="w-60 bg-discord-backgroundSecondary flex flex-col flex-shrink-0">
 	<!-- Header -->
-	<div class="h-12 px-4 flex items-center border-b border-discord-divider shadow-sm flex-shrink-0">
+	<div class="h-12 px-4 flex items-center border-b border-discord-divider shadow-sm flex-shrink-0 gap-2">
 		<h2 class="font-semibold text-discord-textPrimary truncate flex-1">{title}</h2>
 		{#if roomsState.hierarchyLoading}
 			<div class="w-3.5 h-3.5 border-2 border-discord-textMuted border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+		{/if}
+		{#if canAccessSpaceSettings}
+			<button
+				onclick={() => showSpaceSettings = true}
+				class="p-1 rounded text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors flex-shrink-0"
+				title="Space settings"
+			>
+				<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+					<path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.01 7.01 0 0 0-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.47.47 0 0 0 .12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.37 1.04.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.47.47 0 0 0-.12-.61l-2.01-1.58zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z"/>
+				</svg>
+			</button>
 		{/if}
 	</div>
 
@@ -317,6 +342,10 @@
 		</button>
 	</div>
 </div>
+
+{#if showSpaceSettings && activeSpaceRoom}
+	<RoomSettings room={activeSpaceRoom} onClose={() => showSpaceSettings = false} onUpdate={() => { if (roomsState.activeSpaceId) roomsState.roomsInSpace = getRoomsInSpace(roomsState.activeSpaceId); }} />
+{/if}
 
 {#if contextMenu}
 	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->

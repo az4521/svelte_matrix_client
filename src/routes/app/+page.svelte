@@ -81,7 +81,7 @@
 		isDragging = false;
 		const progress = (drawerTranslate + DRAWER_WIDTH) / DRAWER_WIDTH;
 		const startedOpen = dragBaseTranslate === 0;
-		mobileState.leftOpen = startedOpen ? progress >= 0.75 : progress > 0.25;
+		mobileState.leftOpen = startedOpen ? progress >= 0.85 : progress > 0.15;
 		drawerTranslate = mobileState.leftOpen ? 0 : -DRAWER_WIDTH;
 	}
 

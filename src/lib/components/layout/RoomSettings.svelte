@@ -1,0 +1,604 @@
+<script lang="ts">
+	import type { Room, RoomMember } from 'matrix-js-sdk';
+	import { untrack } from 'svelte';
+	import Avatar from '$lib/components/ui/Avatar.svelte';
+	import {
+		getMyPowerLevel, getRoomPowerLevels, setRoomPowerLevels, setUserPowerLevel,
+		kickUser, banUser, unbanUser, getBannedMembers,
+		setRoomName, setRoomTopic, setRoomAvatar, uploadContent,
+		getJoinRule, setJoinRule, getHistoryVisibility, setHistoryVisibility,
+		getSpaceChildren, setSpaceChildOrder, removeSpaceChild,
+		getRoomMembers, getRoomAvatar, getRoomTopic, mxcToHttp,
+		type SpaceChildEntry,
+	} from '$lib/matrix/client';
+	import { mediaStore } from '$lib/stores/media.svelte';
+	import { auth } from '$lib/stores/auth.svelte';
+	import { roomsState } from '$lib/stores/rooms.svelte';
+
+	interface Props {
+		room: Room;
+		onClose: () => void;
+		onUpdate?: () => void;
+	}
+
+	let { room, onClose, onUpdate }: Props = $props();
+
+	type Tab = 'general' | 'access' | 'permissions' | 'members' | 'rooms';
+	let activeTab = $state<Tab>('general');
+
+	const isSpace = $derived(room.isSpaceRoom());
+	const myPowerLevel = $derived(getMyPowerLevel(room));
+	const pl = $derived(getRoomPowerLevels(room));
+	const canEditState = $derived(myPowerLevel >= pl.state_default);
+	const canKick = $derived(myPowerLevel >= pl.kick);
+	const canBan = $derived(myPowerLevel >= pl.ban);
+
+	// ── General tab ────────────────────────────────────────────────────────────
+	let nameInput = $state(room.name ?? '');
+	let topicInput = $state(getRoomTopic(room) ?? '');
+	let avatarUploading = $state(false);
+	let generalSaving = $state(false);
+	let generalError = $state('');
+	let generalSuccess = $state(false);
+
+	const currentAvatarUrl = $derived(mediaStore.resolve(getRoomAvatar(room)));
+
+	async function saveGeneral() {
+		generalError = '';
+		generalSaving = true;
+		try {
+			const promises: Promise<void>[] = [];
+			if (nameInput.trim() && nameInput.trim() !== room.name) {
+				promises.push(setRoomName(room.roomId, nameInput.trim()));
+			}
+			const currentTopic = getRoomTopic(room) ?? '';
+			if (topicInput !== currentTopic) {
+				promises.push(setRoomTopic(room.roomId, topicInput));
+			}
+			await Promise.all(promises);
+			generalSuccess = true;
+			setTimeout(() => generalSuccess = false, 2000);
+		} catch (e: any) {
+			generalError = e?.message ?? 'Failed to save';
+		} finally {
+			generalSaving = false;
+		}
+	}
+
+	async function handleAvatarUpload(e: Event) {
+		const file = (e.target as HTMLInputElement).files?.[0];
+		if (!file) return;
+		avatarUploading = true;
+		generalError = '';
+		try {
+			const mxcUrl = await uploadContent(file);
+			await setRoomAvatar(room.roomId, mxcUrl);
+		} catch (err: any) {
+			generalError = err?.message ?? 'Upload failed';
+		} finally {
+			avatarUploading = false;
+		}
+	}
+
+	// ── Access tab ─────────────────────────────────────────────────────────────
+	let joinRule = $state(getJoinRule(room));
+	let historyVisibility = $state(getHistoryVisibility(room));
+	let accessSaving = $state(false);
+	let accessError = $state('');
+	let accessSuccess = $state(false);
+
+	async function saveAccess() {
+		accessError = '';
+		accessSaving = true;
+		try {
+			const promises: Promise<void>[] = [];
+			if (joinRule !== getJoinRule(room)) promises.push(setJoinRule(room.roomId, joinRule));
+			if (historyVisibility !== getHistoryVisibility(room)) promises.push(setHistoryVisibility(room.roomId, historyVisibility));
+			await Promise.all(promises);
+			accessSuccess = true;
+			setTimeout(() => accessSuccess = false, 2000);
+		} catch (e: any) {
+			accessError = e?.message ?? 'Failed to save';
+		} finally {
+			accessSaving = false;
+		}
+	}
+
+	// ── Permissions tab ────────────────────────────────────────────────────────
+	let plBan = $state(pl.ban);
+	let plKick = $state(pl.kick);
+	let plRedact = $state(pl.redact);
+	let plInvite = $state(pl.invite);
+	let plEventsDefault = $state(pl.events_default);
+	let plStateDefault = $state(pl.state_default);
+	let plUsersDefault = $state(pl.users_default);
+	let permSaving = $state(false);
+	let permError = $state('');
+	let permSuccess = $state(false);
+
+	async function savePermissions() {
+		permError = '';
+		permSaving = true;
+		try {
+			await setRoomPowerLevels(room, {
+				ban: plBan, kick: plKick, redact: plRedact, invite: plInvite,
+				events_default: plEventsDefault, state_default: plStateDefault,
+				users_default: plUsersDefault,
+			});
+			permSuccess = true;
+			setTimeout(() => permSuccess = false, 2000);
+		} catch (e: any) {
+			permError = e?.message ?? 'Failed to save';
+		} finally {
+			permSaving = false;
+		}
+	}
+
+	// ── Members tab ────────────────────────────────────────────────────────────
+	let memberSearch = $state('');
+	let showBanned = $state(false);
+	let memberActionPending = $state<string | null>(null);
+	let memberError = $state('');
+	let reasonInputs = $state<Record<string, string>>({});
+	let showReasonFor = $state<string | null>(null);
+
+	const allMembers = $derived(getRoomMembers(room));
+	const bannedMembers = $derived(getBannedMembers(room));
+
+	const filteredMembers = $derived(
+		allMembers.filter((m) =>
+			!memberSearch || m.name.toLowerCase().includes(memberSearch.toLowerCase()) || m.userId.toLowerCase().includes(memberSearch.toLowerCase())
+		).sort((a, b) => b.powerLevel - a.powerLevel || a.name.localeCompare(b.name))
+	);
+
+	async function doKick(userId: string) {
+		memberActionPending = userId;
+		memberError = '';
+		try {
+			await kickUser(room.roomId, userId, reasonInputs[userId]);
+			showReasonFor = null;
+		} catch (e: any) { memberError = e?.message ?? 'Failed'; }
+		finally { memberActionPending = null; }
+	}
+
+	async function doBan(userId: string) {
+		memberActionPending = userId;
+		memberError = '';
+		try {
+			await banUser(room.roomId, userId, reasonInputs[userId]);
+			showReasonFor = null;
+		} catch (e: any) { memberError = e?.message ?? 'Failed'; }
+		finally { memberActionPending = null; }
+	}
+
+	async function doUnban(userId: string) {
+		memberActionPending = userId;
+		memberError = '';
+		try { await unbanUser(room.roomId, userId); }
+		catch (e: any) { memberError = e?.message ?? 'Failed'; }
+		finally { memberActionPending = null; }
+	}
+
+	async function doSetPowerLevel(member: RoomMember, level: number) {
+		memberActionPending = member.userId;
+		memberError = '';
+		try { await setUserPowerLevel(room, member.userId, level); }
+		catch (e: any) { memberError = e?.message ?? 'Failed'; }
+		finally { memberActionPending = null; }
+	}
+
+	function plLabel(level: number): string {
+		if (level >= 100) return 'Admin';
+		if (level >= 50) return 'Moderator';
+		return 'Member';
+	}
+
+	// ── Rooms tab (spaces only) ────────────────────────────────────────────────
+	let spaceChildren = $state<SpaceChildEntry[]>([]);
+	let roomsError = $state('');
+	let roomActionPending = $state<string | null>(null);
+	let orderEdits = $state<Record<string, string>>({});
+
+	function sortChildren(children: SpaceChildEntry[]) {
+		return [...children].sort((a, b) => {
+			if (a.order && b.order) return a.order.localeCompare(b.order);
+			if (a.order) return -1;
+			if (b.order) return 1;
+			return a.name.localeCompare(b.name);
+		});
+	}
+
+	function loadChildren() {
+		const hierarchyMap = new Map(roomsState.spaceHierarchy.map((r) => [r.roomId, r]));
+		const children = getSpaceChildren(room).map((c) => {
+			const h = hierarchyMap.get(c.roomId);
+			return {
+				...c,
+				name: c.isJoined ? c.name : (h?.name ?? c.name),
+				avatarUrl: c.isJoined ? c.avatarUrl : (h?.avatarUrl ?? c.avatarUrl),
+			};
+		});
+		spaceChildren = sortChildren(children);
+		// Reset input values to match current server state
+		orderEdits = Object.fromEntries(spaceChildren.map((c) => [c.roomId, c.order]));
+	}
+
+	$effect(() => {
+		const tab = activeTab;
+		const space = isSpace;
+		untrack(() => {
+			if (tab === 'rooms' && space) {
+				orderEdits = {}; // reset so loadChildren sets fresh values
+				loadChildren();
+			}
+		});
+	});
+
+	async function saveOrder(child: SpaceChildEntry) {
+		roomActionPending = child.roomId;
+		roomsError = '';
+		try {
+			const newOrder = orderEdits[child.roomId] ?? '';
+			await setSpaceChildOrder(room.roomId, child.roomId, newOrder, child.via);
+			// Update child's order directly and re-sort (server state may not have synced yet)
+			spaceChildren = sortChildren(
+				spaceChildren.map((c) => c.roomId === child.roomId ? { ...c, order: newOrder } : c)
+			);
+			onUpdate?.();
+		} catch (e: any) { roomsError = e?.message ?? 'Failed'; }
+		finally { roomActionPending = null; }
+	}
+
+	async function doRemoveChild(child: SpaceChildEntry) {
+		roomActionPending = child.roomId;
+		roomsError = '';
+		try {
+			await removeSpaceChild(room.roomId, child.roomId);
+			spaceChildren = spaceChildren.filter((c) => c.roomId !== child.roomId);
+			onUpdate?.();
+		} catch (e: any) { roomsError = e?.message ?? 'Failed'; }
+		finally { roomActionPending = null; }
+	}
+
+	const tabs: { id: Tab; label: string }[] = [
+		{ id: 'general', label: 'General' },
+		{ id: 'access', label: 'Access' },
+		{ id: 'permissions', label: 'Permissions' },
+		{ id: 'members', label: 'Members' },
+		...(isSpace ? [{ id: 'rooms' as Tab, label: 'Rooms' }] : []),
+	];
+</script>
+
+<svelte:window onkeydown={(e) => { if (e.key === 'Escape') onClose(); }} />
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<div
+	class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+	onclick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+>
+	<div class="bg-discord-backgroundSecondary rounded-xl shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden" style="max-height: 85dvh;">
+		<!-- Header -->
+		<div class="flex items-center justify-between px-6 py-4 border-b border-discord-divider flex-shrink-0">
+			<h2 class="text-lg font-bold text-discord-textPrimary truncate">{room.name} — Settings</h2>
+			<!-- svelte-ignore a11y_consider_explicit_label -->
+			<button onclick={onClose} class="p-1.5 rounded text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors flex-shrink-0">
+				<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+			</button>
+		</div>
+
+		<div class="flex flex-1 min-h-0">
+			<!-- Tab sidebar -->
+			<nav class="w-40 flex-shrink-0 border-r border-discord-divider py-3 flex flex-col gap-0.5 px-2">
+				{#each tabs as tab (tab.id)}
+					<button
+						onclick={() => activeTab = tab.id}
+						class="w-full text-left px-3 py-2 rounded text-sm font-medium transition-colors"
+						class:bg-discord-messageHover={activeTab === tab.id}
+						class:text-discord-textPrimary={activeTab === tab.id}
+						class:text-discord-textMuted={activeTab !== tab.id}
+					>{tab.label}</button>
+				{/each}
+			</nav>
+
+			<!-- Tab content -->
+			<div class="flex-1 overflow-y-auto p-6 min-w-0">
+
+				<!-- ── General ─────────────────────────────────────────── -->
+				{#if activeTab === 'general'}
+					<div class="space-y-5">
+						<!-- Avatar -->
+						<div>
+							<p class="text-xs font-semibold text-discord-textMuted uppercase tracking-wide mb-2">Room Avatar</p>
+							<div class="flex items-center gap-4">
+								<div class="w-16 h-16 rounded-full bg-discord-backgroundTertiary overflow-hidden flex-shrink-0 flex items-center justify-center">
+									{#if currentAvatarUrl}
+										<img src={currentAvatarUrl} alt="" class="w-full h-full object-cover" />
+									{:else}
+										<span class="text-2xl font-bold text-discord-textMuted">{room.name?.[0]?.toUpperCase() ?? '#'}</span>
+									{/if}
+								</div>
+								{#if canEditState}
+									<label class="cursor-pointer px-3 py-1.5 rounded bg-discord-backgroundTertiary hover:bg-discord-messageHover text-discord-textPrimary text-sm font-medium transition-colors {avatarUploading ? 'opacity-50 pointer-events-none' : ''}">
+										{avatarUploading ? 'Uploading…' : 'Upload Image'}
+										<input type="file" accept="image/*" class="hidden" onchange={handleAvatarUpload} disabled={avatarUploading} />
+									</label>
+								{/if}
+							</div>
+						</div>
+
+						<!-- Name -->
+						<div>
+							<!-- svelte-ignore a11y_label_has_associated_control -->
+							<label class="block text-xs font-semibold text-discord-textMuted uppercase tracking-wide mb-1.5">Room Name</label>
+							<input
+								bind:value={nameInput}
+								disabled={!canEditState}
+								class="w-full bg-discord-backgroundTertiary text-discord-textPrimary text-sm rounded px-3 py-2 outline-none border border-transparent focus:border-discord-accent/50 disabled:opacity-50"
+							/>
+						</div>
+
+						<!-- Topic -->
+						<!-- svelte-ignore a11y_label_has_associated_control -->
+						<div>
+							<label class="block text-xs font-semibold text-discord-textMuted uppercase tracking-wide mb-1.5">Topic</label>
+							<textarea
+								bind:value={topicInput}
+								disabled={!canEditState}
+								rows="3"
+								class="w-full bg-discord-backgroundTertiary text-discord-textPrimary text-sm rounded px-3 py-2 outline-none border border-transparent focus:border-discord-accent/50 resize-none disabled:opacity-50"
+							></textarea>
+						</div>
+
+						{#if generalError}<p class="text-sm text-discord-danger">{generalError}</p>{/if}
+						{#if canEditState}
+							<button
+								onclick={saveGeneral}
+								disabled={generalSaving}
+								class="px-4 py-2 bg-discord-accent hover:bg-discord-accentHover text-white rounded font-medium text-sm transition-colors disabled:opacity-50"
+							>{generalSaving ? 'Saving…' : generalSuccess ? 'Saved!' : 'Save Changes'}</button>
+						{/if}
+					</div>
+
+				<!-- ── Access ──────────────────────────────────────────── -->
+				{:else if activeTab === 'access'}
+					<div class="space-y-5">
+						<div>
+							<p class="text-xs font-semibold text-discord-textMuted uppercase tracking-wide mb-2">Who can join?</p>
+							<div class="space-y-1.5">
+								{#each [['invite', 'Invite only — members must be invited'], ['knock', 'Knock — users can request to join'], ['public', 'Public — anyone can join']] as [value, label]}
+									<label class="flex items-center gap-2.5 cursor-pointer {!canEditState ? 'opacity-50 pointer-events-none' : ''}">
+										<input type="radio" bind:group={joinRule} value={value} class="accent-discord-accent" />
+										<span class="text-sm text-discord-textPrimary">{label}</span>
+									</label>
+								{/each}
+							</div>
+						</div>
+
+						<div>
+							<p class="text-xs font-semibold text-discord-textMuted uppercase tracking-wide mb-2">Message History</p>
+							<div class="space-y-1.5">
+								{#each [['world_readable', 'Anyone (including guests)'], ['shared', 'Anyone once joined'], ['invited', 'Members since invited'], ['joined', 'Members since joining']] as [value, label]}
+									<label class="flex items-center gap-2.5 cursor-pointer {!canEditState ? 'opacity-50 pointer-events-none' : ''}">
+										<input type="radio" bind:group={historyVisibility} value={value} class="accent-discord-accent" />
+										<span class="text-sm text-discord-textPrimary">{label}</span>
+									</label>
+								{/each}
+							</div>
+						</div>
+
+						{#if accessError}<p class="text-sm text-discord-danger">{accessError}</p>{/if}
+						{#if canEditState}
+							<button
+								onclick={saveAccess}
+								disabled={accessSaving}
+								class="px-4 py-2 bg-discord-accent hover:bg-discord-accentHover text-white rounded font-medium text-sm transition-colors disabled:opacity-50"
+							>{accessSaving ? 'Saving…' : accessSuccess ? 'Saved!' : 'Save Changes'}</button>
+						{/if}
+					</div>
+
+				<!-- ── Permissions ─────────────────────────────────────── -->
+				{:else if activeTab === 'permissions'}
+					<div class="space-y-4">
+						<p class="text-xs text-discord-textMuted">Power level required for each action (0–100).</p>
+						{#each [
+							['Send messages', 'plEventsDefault'],
+							['Change room settings', 'plStateDefault'],
+							['Default member level', 'plUsersDefault'],
+							['Invite members', 'plInvite'],
+							['Kick members', 'plKick'],
+							['Ban members', 'plBan'],
+							['Redact messages', 'plRedact'],
+						] as [label, key]}
+							{@const bindings: Record<string, any> = { plEventsDefault, plStateDefault, plUsersDefault, plInvite, plKick, plBan, plRedact }}
+							{@const setters: Record<string, (v: number) => void> = {
+								plEventsDefault: (v) => plEventsDefault = v,
+								plStateDefault: (v) => plStateDefault = v,
+								plUsersDefault: (v) => plUsersDefault = v,
+								plInvite: (v) => plInvite = v,
+								plKick: (v) => plKick = v,
+								plBan: (v) => plBan = v,
+								plRedact: (v) => plRedact = v,
+							}}
+							<div class="flex items-center justify-between gap-4">
+								<span class="text-sm text-discord-textPrimary">{label}</span>
+								<div class="flex items-center gap-2">
+									<input
+										type="number"
+										min="0" max="100"
+										value={bindings[key]}
+										oninput={(e) => setters[key](Number((e.target as HTMLInputElement).value))}
+										disabled={!canEditState}
+										class="w-16 bg-discord-backgroundTertiary text-discord-textPrimary text-sm rounded px-2 py-1 outline-none border border-transparent focus:border-discord-accent/50 text-center disabled:opacity-50"
+									/>
+									<span class="text-xs text-discord-textMuted w-16">{plLabel(bindings[key])}</span>
+								</div>
+							</div>
+						{/each}
+
+						{#if permError}<p class="text-sm text-discord-danger">{permError}</p>{/if}
+						{#if canEditState}
+							<button
+								onclick={savePermissions}
+								disabled={permSaving}
+								class="px-4 py-2 bg-discord-accent hover:bg-discord-accentHover text-white rounded font-medium text-sm transition-colors disabled:opacity-50"
+							>{permSaving ? 'Saving…' : permSuccess ? 'Saved!' : 'Save Changes'}</button>
+						{/if}
+					</div>
+
+				<!-- ── Members ─────────────────────────────────────────── -->
+				{:else if activeTab === 'members'}
+					<div class="space-y-3">
+						<div class="flex items-center gap-3">
+							<input
+								bind:value={memberSearch}
+								placeholder="Search members…"
+								class="flex-1 bg-discord-backgroundTertiary text-discord-textPrimary placeholder-discord-textMuted text-sm rounded px-3 py-1.5 outline-none border border-transparent focus:border-discord-accent/50"
+							/>
+							{#if canBan}
+								<button
+									onclick={() => showBanned = !showBanned}
+									class="px-3 py-1.5 rounded text-sm font-medium transition-colors {showBanned ? 'bg-discord-danger text-white' : 'bg-discord-backgroundTertiary text-discord-textMuted hover:text-discord-textPrimary'}"
+								>Banned ({bannedMembers.length})</button>
+							{/if}
+						</div>
+
+						{#if memberError}<p class="text-sm text-discord-danger">{memberError}</p>{/if}
+
+						{#if showBanned}
+							<!-- Banned members -->
+							<div class="space-y-1">
+								{#each bannedMembers as member (member.userId)}
+									<div class="flex items-center gap-3 p-2 rounded bg-discord-backgroundTertiary">
+										<Avatar src={mxcToHttp(member.getMxcAvatarUrl())} name={member.name} size={28} />
+										<div class="flex-1 min-w-0">
+											<p class="text-sm font-medium text-discord-textPrimary truncate">{member.name}</p>
+											<p class="text-xs text-discord-textMuted truncate">{member.userId}</p>
+										</div>
+										{#if canBan}
+											<button
+												onclick={() => doUnban(member.userId)}
+												disabled={memberActionPending === member.userId}
+												class="px-2.5 py-1 rounded text-xs font-semibold bg-discord-backgroundSecondary hover:bg-discord-messageHover text-discord-textPrimary transition-colors disabled:opacity-50"
+											>Unban</button>
+										{/if}
+									</div>
+								{/each}
+								{#if bannedMembers.length === 0}<p class="text-sm text-discord-textMuted text-center py-4">No banned members</p>{/if}
+							</div>
+						{:else}
+							<!-- Active members -->
+							<div class="space-y-1">
+								{#each filteredMembers as member (member.userId)}
+									{@const isSelf = member.userId === auth.userId}
+									{@const canActOnMember = !isSelf && myPowerLevel > member.powerLevel}
+									<div class="rounded bg-discord-backgroundTertiary overflow-hidden">
+										<div class="flex items-center gap-3 p-2">
+											<Avatar src={mxcToHttp(member.getMxcAvatarUrl())} name={member.name} size={28} />
+											<div class="flex-1 min-w-0">
+												<p class="text-sm font-medium text-discord-textPrimary truncate">{member.name}{isSelf ? ' (you)' : ''}</p>
+												<p class="text-xs text-discord-textMuted truncate">{member.userId}</p>
+											</div>
+											<span class="text-xs text-discord-textMuted flex-shrink-0">{plLabel(member.powerLevel)} ({member.powerLevel})</span>
+											{#if canActOnMember}
+												<button
+													onclick={() => showReasonFor = showReasonFor === member.userId ? null : member.userId}
+													class="p-1 rounded text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors"
+													title="Actions"
+												>
+													<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+												</button>
+											{/if}
+										</div>
+										{#if showReasonFor === member.userId && canActOnMember}
+											<div class="px-3 pb-3 pt-1 border-t border-discord-divider space-y-2">
+												<input
+													bind:value={reasonInputs[member.userId]}
+													placeholder="Reason (optional)"
+													class="w-full bg-discord-backgroundSecondary text-discord-textPrimary placeholder-discord-textMuted text-xs rounded px-2 py-1.5 outline-none border border-transparent focus:border-discord-accent/50"
+												/>
+												<div class="flex flex-wrap gap-2">
+													{#if myPowerLevel >= 100 || myPowerLevel > member.powerLevel}
+														<select
+															onchange={(e) => doSetPowerLevel(member, Number((e.target as HTMLSelectElement).value))}
+															disabled={memberActionPending === member.userId}
+															class="px-2 py-1 rounded text-xs bg-discord-backgroundSecondary text-discord-textPrimary border border-discord-divider disabled:opacity-50"
+														>
+															<option value="">Set role…</option>
+															{#if myPowerLevel >= 100}<option value="100">Admin (100)</option>{/if}
+															{#if myPowerLevel >= 50}<option value="50">Moderator (50)</option>{/if}
+															<option value="0">Member (0)</option>
+														</select>
+													{/if}
+													{#if canKick}
+														<button
+															onclick={() => doKick(member.userId)}
+															disabled={memberActionPending === member.userId}
+															class="px-2.5 py-1 rounded text-xs font-semibold bg-discord-backgroundSecondary hover:bg-discord-warning/20 text-discord-warning transition-colors disabled:opacity-50"
+														>Kick</button>
+													{/if}
+													{#if canBan}
+														<button
+															onclick={() => doBan(member.userId)}
+															disabled={memberActionPending === member.userId}
+															class="px-2.5 py-1 rounded text-xs font-semibold bg-discord-backgroundSecondary hover:bg-discord-danger/20 text-discord-danger transition-colors disabled:opacity-50"
+														>Ban</button>
+													{/if}
+												</div>
+											</div>
+										{/if}
+									</div>
+								{/each}
+							</div>
+						{/if}
+					</div>
+
+				<!-- ── Rooms (space only) ──────────────────────────────── -->
+				{:else if activeTab === 'rooms'}
+					<div class="space-y-3">
+						<p class="text-xs text-discord-textMuted">Set the <code class="font-mono bg-discord-backgroundTertiary px-1 rounded">order</code> field on each child room to control sort order (lexicographic). Leave blank to sort by creation time.</p>
+						{#if roomsError}<p class="text-sm text-discord-danger">{roomsError}</p>{/if}
+						<div class="space-y-1.5">
+							{#each spaceChildren as child (child.roomId)}
+								<div class="flex items-center gap-3 p-2 rounded bg-discord-backgroundTertiary">
+									<div class="w-7 h-7 rounded-full bg-discord-backgroundSecondary flex-shrink-0 overflow-hidden flex items-center justify-center text-xs font-bold text-discord-textMuted">
+										{#if child.avatarUrl}
+											<img src={mediaStore.resolve(child.avatarUrl)} alt="" class="w-full h-full object-cover" />
+										{:else}
+											{child.name[0]?.toUpperCase() ?? '#'}
+										{/if}
+									</div>
+									<div class="flex-1 min-w-0">
+										<p class="text-sm font-medium text-discord-textPrimary truncate">{child.name}</p>
+										<p class="text-xs text-discord-textMuted truncate">{child.roomId}</p>
+									</div>
+									{#if canEditState}
+										<input
+											bind:value={orderEdits[child.roomId]}
+											placeholder="order"
+											class="w-24 bg-discord-backgroundSecondary text-discord-textPrimary placeholder-discord-textMuted text-xs rounded px-2 py-1 outline-none border border-transparent focus:border-discord-accent/50 font-mono"
+										/>
+										<button
+											onclick={() => saveOrder(child)}
+											disabled={roomActionPending === child.roomId || (orderEdits[child.roomId] ?? '') === child.order}
+											class="px-2.5 py-1 rounded text-xs font-semibold bg-discord-accent hover:bg-discord-accentHover text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+										>{roomActionPending === child.roomId ? '…' : 'Set'}</button>
+										<button
+											onclick={() => doRemoveChild(child)}
+											disabled={roomActionPending === child.roomId}
+											class="p-1 rounded text-discord-textMuted hover:text-discord-danger hover:bg-discord-messageHover transition-colors disabled:opacity-50"
+											title="Remove from space"
+										>
+											<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+										</button>
+									{/if}
+								</div>
+							{/each}
+							{#if spaceChildren.length === 0}<p class="text-sm text-discord-textMuted text-center py-4">No child rooms</p>{/if}
+						</div>
+					</div>
+				{/if}
+
+			</div>
+		</div>
+	</div>
+</div>

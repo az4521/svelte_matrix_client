@@ -22,6 +22,8 @@
 	import { getMessages, setMessages, appendMessage, canLoadMore, setCanLoadMore, bumpReactionTick } from '$lib/stores/messages.svelte';
 	import { bumpUnreadTick } from '$lib/stores/rooms.svelte';
 	import { mobileState } from '$lib/stores/mobile.svelte';
+	import RoomSettings from '$lib/components/layout/RoomSettings.svelte';
+	import { getMyPowerLevel, getRoomPowerLevels } from '$lib/matrix/client';
 
 	interface Props {
 		room: Room;
@@ -82,6 +84,13 @@
 	}
 	// untrack avoids the "captures initial value" warning - we intentionally want the initial prop value
 	let showMemberListLocal = $state(untrack(() => showMemberList));
+	let showRoomSettings = $state(false);
+
+	const canAccessSettings = $derived.by(() => {
+		const myPl = getMyPowerLevel(room);
+		const pl = getRoomPowerLevels(room);
+		return myPl >= pl.state_default || myPl >= pl.kick || myPl >= pl.ban;
+	});
 
 	// Hide member list when switching to mobile (isMobile is set async in onMount)
 	$effect(() => {
@@ -384,10 +393,22 @@
 				<div class="w-px h-5 bg-discord-divider"></div>
 				<p class="text-sm text-discord-textMuted truncate flex-1">{topic}</p>
 			{/if}
+			<!-- Settings button (admins/mods only) -->
+			{#if canAccessSettings}
+				<button
+					onclick={() => showRoomSettings = true}
+					class="ml-auto p-1.5 rounded text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors"
+					title="Room settings"
+				>
+					<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+						<path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.01 7.01 0 0 0-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.47.47 0 0 0 .12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.37 1.04.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.47.47 0 0 0-.12-.61l-2.01-1.58zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z"/>
+					</svg>
+				</button>
+			{/if}
 			<!-- Toggle member list -->
 			<button
 				onclick={() => showMemberListLocal = !showMemberListLocal}
-				class="ml-auto p-1.5 rounded text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors"
+				class="{canAccessSettings ? '' : 'ml-auto'} p-1.5 rounded text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors"
 				title="Toggle member list"
 			>
 				<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -489,3 +510,7 @@
 		<MemberList {room} />
 	{/if}
 </div>
+
+{#if showRoomSettings}
+	<RoomSettings {room} onClose={() => showRoomSettings = false} />
+{/if}
