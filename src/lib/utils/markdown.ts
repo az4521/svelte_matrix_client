@@ -7,6 +7,9 @@
  *   ```lang\ncode block\n```
  *   # / ## / ### headings
  *   > blockquote
+ *   - unordered list item
+ *   1. ordered list item
+ *   -# subtext (smaller muted text)
  */
 
 function escapeHtml(s: string): string {
@@ -96,6 +99,43 @@ export function parseMarkdown(input: string): { formattedBody: string; hasFormat
 			parts.push(`<h${level}>${html}</h${level}>`);
 			hasFormatting = true;
 			i++;
+			continue;
+		}
+
+		// Subtext (-# prefix)
+		if (line.startsWith('-# ')) {
+			const { html } = processInline(line.slice(3));
+			parts.push(`<small>${html}</small>`);
+			hasFormatting = true;
+			i++;
+			continue;
+		}
+
+		// Unordered list (lines starting with "- ")
+		if (line.startsWith('- ') || line === '-') {
+			const items: string[] = [];
+			while (i < lines.length && (lines[i].startsWith('- ') || lines[i] === '-')) {
+				const content = lines[i].startsWith('- ') ? lines[i].slice(2) : '';
+				const { html } = processInline(content);
+				items.push(`<li>${html}</li>`);
+				i++;
+			}
+			parts.push(`<ul>${items.join('')}</ul>`);
+			hasFormatting = true;
+			continue;
+		}
+
+		// Ordered list (lines starting with "N. ")
+		if (/^\d+\.\s/.test(line)) {
+			const items: string[] = [];
+			while (i < lines.length && /^\d+\.\s/.test(lines[i])) {
+				const content = lines[i].replace(/^\d+\.\s+/, '');
+				const { html } = processInline(content);
+				items.push(`<li>${html}</li>`);
+				i++;
+			}
+			parts.push(`<ol>${items.join('')}</ol>`);
+			hasFormatting = true;
 			continue;
 		}
 
