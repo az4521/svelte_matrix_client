@@ -32,7 +32,7 @@
 	});
 
 	const stickerPacks = $derived(getCustomStickerPacks(roomsState.activeSpaceId));
-	const ownAvatarUrl = $derived(getOwnAvatarUrl(40));
+	const ownAvatarUrl = $derived(getOwnAvatarUrl());
 
 	$effect(() => {
 		if (!activeTab && stickerPacks.length > 0) activeTab = stickerPacks[0].id;
