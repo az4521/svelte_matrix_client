@@ -3,6 +3,7 @@
 	import { EMOJI_CATEGORIES, ALL_EMOJIS } from '$lib/data/emojis';
 	import { getCustomEmojiPacks, getOwnAvatarUrl, type CustomEmoji } from '$lib/matrix/client';
 	import { roomsState } from '$lib/stores/rooms.svelte';
+	import { mobileState } from '$lib/stores/mobile.svelte';
 	import { mediaStore } from '$lib/stores/media.svelte';
 	import { renderEmoji } from '$lib/utils/twemoji';
 
@@ -28,7 +29,7 @@
 	// Sections whose emoji have been revealed by the IntersectionObserver
 	let revealedSections = $state(new Set<string>());
 
-	$effect(() => { searchEl?.focus(); });
+	$effect(() => { if (!mobileState.isMobile) searchEl?.focus(); });
 
 	// Scroll the tab bar so the active tab button is visible
 	$effect(() => {
@@ -236,8 +237,8 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-	class="w-72 bg-discord-backgroundSecondary border border-discord-divider rounded-xl shadow-2xl flex flex-col"
-	style="max-height: 380px;"
+	class="{mobileState.isMobile ? 'w-full rounded-t-xl' : 'w-72 rounded-xl'} bg-discord-backgroundSecondary border border-discord-divider shadow-2xl flex flex-col"
+	style={mobileState.isMobile ? 'max-height: 50dvh;' : 'max-height: 380px;'}
 	onkeydown={onKeydown}
 	onwheel={(e) => e.stopPropagation()}
 >

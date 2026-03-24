@@ -63,6 +63,21 @@
 	let showGifPicker = $state(false);
 	let textareaFocusedBeforePicker = false;
 
+	// Track keyboard height on mobile so pickers stay above it
+	let keyboardOffset = $state(0);
+	$effect(() => {
+		if (!mobileState.isMobile) { keyboardOffset = 0; return; }
+		const vv = window.visualViewport;
+		if (!vv) return;
+		const update = () => {
+			keyboardOffset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+		};
+		vv.addEventListener('resize', update);
+		vv.addEventListener('scroll', update);
+		update();
+		return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
+	});
+
 	function anyPickerOpen() {
 		return showEmojiPicker || showStickerPicker || showGifPicker;
 	}
@@ -384,14 +399,15 @@
 			{#if showGifPicker}
 				<!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
 				<div class="fixed inset-0 z-40" onclick={() => (showGifPicker = false)} onkeydown={() => (showGifPicker = false)}></div>
-				<div class="absolute bottom-full right-0 mb-2 z-50">
-					<GifPicker
-						onSelect={insertGif}
-						onClose={() => closePicker('gif', true)}
-					onSwitchToEmoji={() => openPicker('emoji')}
-					onSwitchToSticker={() => openPicker('sticker')}
-					/>
-				</div>
+				{#if mobileState.isMobile}
+					<div class="fixed left-0 right-0 z-50" style="bottom: {keyboardOffset}px;">
+						<GifPicker onSelect={insertGif} onClose={() => closePicker('gif', true)} onSwitchToEmoji={() => openPicker('emoji')} onSwitchToSticker={() => openPicker('sticker')} />
+					</div>
+				{:else}
+					<div class="absolute bottom-full right-0 mb-2 z-50">
+						<GifPicker onSelect={insertGif} onClose={() => closePicker('gif', true)} onSwitchToEmoji={() => openPicker('emoji')} onSwitchToSticker={() => openPicker('sticker')} />
+					</div>
+				{/if}
 			{/if}
 		</div>
 
@@ -410,14 +426,15 @@
 			{#if showStickerPicker}
 				<!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
 				<div class="fixed inset-0 z-40" onclick={() => (showStickerPicker = false)} onkeydown={() => (showStickerPicker = false)}></div>
-				<div class="absolute bottom-full right-0 mb-2 z-50">
-					<StickerPicker
-						onSelect={sendStickerMessage}
-						onClose={() => closePicker('sticker', true)}
-					onSwitchToEmoji={() => openPicker('emoji')}
-					onSwitchToGif={() => openPicker('gif')}
-					/>
-				</div>
+				{#if mobileState.isMobile}
+					<div class="fixed left-0 right-0 z-50" style="bottom: {keyboardOffset}px;">
+						<StickerPicker onSelect={sendStickerMessage} onClose={() => closePicker('sticker', true)} onSwitchToEmoji={() => openPicker('emoji')} onSwitchToGif={() => openPicker('gif')} />
+					</div>
+				{:else}
+					<div class="absolute bottom-full right-0 mb-2 z-50">
+						<StickerPicker onSelect={sendStickerMessage} onClose={() => closePicker('sticker', true)} onSwitchToEmoji={() => openPicker('emoji')} onSwitchToGif={() => openPicker('gif')} />
+					</div>
+				{/if}
 			{/if}
 		</div>
 
@@ -438,15 +455,15 @@
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<!-- svelte-ignore a11y_click_events_have_key_events -->
 				<div class="fixed inset-0 z-40" onclick={() => (showEmojiPicker = false)}></div>
-				<div class="absolute bottom-full right-0 mb-2 z-50">
-					<EmojiPicker
-						onSelect={insertEmoji}
-						onSelectCustom={insertCustomEmoji}
-						onClose={() => closePicker('emoji', true)}
-					onSwitchToSticker={() => openPicker('sticker')}
-					onSwitchToGif={() => openPicker('gif')}
-					/>
-				</div>
+				{#if mobileState.isMobile}
+					<div class="fixed left-0 right-0 z-50" style="bottom: {keyboardOffset}px;">
+						<EmojiPicker onSelect={insertEmoji} onSelectCustom={insertCustomEmoji} onClose={() => closePicker('emoji', true)} onSwitchToSticker={() => openPicker('sticker')} onSwitchToGif={() => openPicker('gif')} />
+					</div>
+				{:else}
+					<div class="absolute bottom-full right-0 mb-2 z-50">
+						<EmojiPicker onSelect={insertEmoji} onSelectCustom={insertCustomEmoji} onClose={() => closePicker('emoji', true)} onSwitchToSticker={() => openPicker('sticker')} onSwitchToGif={() => openPicker('gif')} />
+					</div>
+				{/if}
 			{/if}
 		</div>
 
