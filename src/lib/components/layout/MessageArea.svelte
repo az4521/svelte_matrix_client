@@ -21,6 +21,7 @@
 	} from '$lib/matrix/client';
 	import { getMessages, setMessages, appendMessage, canLoadMore, setCanLoadMore, bumpReactionTick } from '$lib/stores/messages.svelte';
 	import { bumpUnreadTick } from '$lib/stores/rooms.svelte';
+	import { mobileState } from '$lib/stores/mobile.svelte';
 
 	interface Props {
 		room: Room;
@@ -86,6 +87,80 @@
 	$effect(() => {
 		if (isMobile) showMemberListLocal = false;
 	});
+
+	// Keep global rightOpen in sync so left drawer can avoid conflicting gestures
+	$effect(() => {
+		mobileState.rightOpen = isMobile && showMemberListLocal;
+	});
+
+	// Animated right drawer (mobile member list)
+	const MEMBER_WIDTH = 240; // w-60
+	let memberTranslate = $state(MEMBER_WIDTH);
+	let isMemberDragging = $state(false);
+	let memberDragPending = false;
+	let memberDragStartX = 0;
+	let memberDragStartY = 0;
+	let memberDragBase = 0;
+
+	$effect(() => {
+		if (!isMemberDragging) {
+			memberTranslate = showMemberListLocal ? 0 : MEMBER_WIDTH;
+		}
+	});
+
+	const memberBackdropOpacity = $derived(
+		isMobile ? ((MEMBER_WIDTH - memberTranslate) / MEMBER_WIDTH) * 0.5 : 0
+	);
+
+	function memberDragMove(e: TouchEvent) {
+		if (!memberDragPending && !isMemberDragging) return;
+		const touch = e.touches[0];
+		const dx = touch.clientX - memberDragStartX;
+		const dy = touch.clientY - memberDragStartY;
+
+		if (memberDragPending) {
+			if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+			if (Math.abs(dy) > Math.abs(dx)) { memberDragPending = false; cleanupMemberListeners(); return; }
+			const openingGesture = dx < 0 && !showMemberListLocal;
+			const closingGesture = dx > 0 && showMemberListLocal;
+			if (!openingGesture && !closingGesture) { memberDragPending = false; cleanupMemberListeners(); return; }
+			memberDragPending = false;
+			isMemberDragging = true;
+		}
+
+		if (isMemberDragging) {
+			e.preventDefault();
+			memberTranslate = Math.max(0, Math.min(MEMBER_WIDTH, memberDragBase + dx));
+		}
+	}
+
+	function memberDragEnd() {
+		memberDragPending = false;
+		cleanupMemberListeners();
+		if (!isMemberDragging) return;
+		isMemberDragging = false;
+		const progress = (MEMBER_WIDTH - memberTranslate) / MEMBER_WIDTH;
+		const startedOpen = memberDragBase === 0;
+		showMemberListLocal = startedOpen ? progress >= 0.75 : progress > 0.25;
+		memberTranslate = showMemberListLocal ? 0 : MEMBER_WIDTH;
+	}
+
+	function cleanupMemberListeners() {
+		document.removeEventListener('touchmove', memberDragMove);
+		document.removeEventListener('touchend', memberDragEnd);
+		document.removeEventListener('touchcancel', memberDragEnd);
+	}
+
+	function memberDragStart(e: TouchEvent) {
+		if (!isMobile || isMemberDragging || memberDragPending || mobileState.leftOpen) return;
+		memberDragStartX = e.touches[0].clientX;
+		memberDragStartY = e.touches[0].clientY;
+		memberDragBase = showMemberListLocal ? 0 : MEMBER_WIDTH;
+		memberDragPending = true;
+		document.addEventListener('touchmove', memberDragMove, { passive: false });
+		document.addEventListener('touchend', memberDragEnd);
+		document.addEventListener('touchcancel', memberDragEnd);
+	}
 
 	const roomId = $derived(room.roomId);
 	const roomName = $derived(getRoomDisplayName(room));
@@ -273,6 +348,7 @@
 	ondragleave={onDragLeave}
 	ondragover={onDragOver}
 	ondrop={onDrop}
+	ontouchstart={memberDragStart}
 >
 	<!-- Drop overlay -->
 	{#if isDragOver}
@@ -395,16 +471,21 @@
 	<!-- Debug panel (Ctrl+Shift+D to toggle) -->
 	<DebugPanel {room} />
 
-	<!-- Member list sidebar (overlay on mobile, inline on desktop) -->
-	{#if showMemberListLocal}
-		{#if isMobile}
-			<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-			<div class="absolute inset-0 z-30 bg-black/50" onclick={() => (showMemberListLocal = false)}></div>
-			<div class="absolute inset-y-0 right-0 z-40 w-60 h-full shadow-2xl">
-				<MemberList {room} />
-			</div>
-		{:else}
+	<!-- Member list sidebar (animated overlay on mobile, inline on desktop) -->
+	{#if isMobile}
+		<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+		<div
+			class="absolute inset-0 z-30"
+			style="background: rgba(0,0,0,{memberBackdropOpacity}); pointer-events: {memberBackdropOpacity > 0.01 ? 'auto' : 'none'};"
+			onclick={() => { if (!isMemberDragging) showMemberListLocal = false; }}
+		></div>
+		<div
+			class="absolute inset-y-0 right-0 z-40 w-60 h-full"
+			style="transform: translateX({memberTranslate}px); {isMemberDragging ? '' : 'transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);'} {memberTranslate >= MEMBER_WIDTH ? '' : 'box-shadow: -25px 0 50px -12px rgba(0,0,0,0.5);'}"
+		>
 			<MemberList {room} />
-		{/if}
+		</div>
+	{:else if showMemberListLocal}
+		<MemberList {room} />
 	{/if}
 </div>

@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+html, body {
+  overscroll-behavior-x: none;
+}
+
 :root {
   /* ── Brand (blurple) scale ───────────────────────── */
   --brand-100: #f8f9fd;

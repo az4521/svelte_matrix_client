@@ -26,19 +26,80 @@
 
 	let showSettings = $state(false);
 
-	// Swipe gestures for mobile drawers
-	let swipeStartX = 0, swipeStartY = 0;
-	function onSwipeTouchStart(e: TouchEvent) {
-		swipeStartX = e.touches[0].clientX;
-		swipeStartY = e.touches[0].clientY;
+	// Animated drawer drag (mobile)
+	const DRAWER_WIDTH = 312; // 72px SpaceSidebar + 240px RoomList
+	let drawerTranslate = $state(-DRAWER_WIDTH);
+	let isDragging = $state(false);
+	let dragStartX = 0;
+	let dragBaseTranslate = 0;
+
+	// Keep translate in sync when state changes programmatically (hamburger, etc.)
+	$effect(() => {
+		if (!isDragging) {
+			drawerTranslate = mobileState.leftOpen ? 0 : -DRAWER_WIDTH;
+		}
+	});
+
+	const backdropOpacity = $derived(
+		mobileState.isMobile ? ((drawerTranslate + DRAWER_WIDTH) / DRAWER_WIDTH) * 0.5 : 0
+	);
+
+	let dragPending = false; // touch down, direction not yet determined
+	let dragStartY = 0;
+
+	function drawerDragMove(e: TouchEvent) {
+		if (!dragPending && !isDragging) return;
+		const touch = e.touches[0];
+		const dx = touch.clientX - dragStartX;
+		const dy = touch.clientY - dragStartY;
+
+		if (dragPending) {
+			if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+			if (Math.abs(dy) > Math.abs(dx)) {
+				// Primarily vertical — cancel
+				dragPending = false;
+				cleanupDocListeners();
+				return;
+			}
+			const openingGesture = dx > 0 && !mobileState.leftOpen;
+			const closingGesture = dx < 0 && mobileState.leftOpen;
+			if (!openingGesture && !closingGesture) { dragPending = false; cleanupDocListeners(); return; }
+			dragPending = false;
+			isDragging = true;
+		}
+
+		if (isDragging) {
+			e.preventDefault();
+			drawerTranslate = Math.min(0, Math.max(-DRAWER_WIDTH, dragBaseTranslate + dx));
+		}
 	}
-	function onSwipeTouchEnd(e: TouchEvent) {
-		if (!mobileState.isMobile) return;
-		const dx = e.changedTouches[0].clientX - swipeStartX;
-		const dy = e.changedTouches[0].clientY - swipeStartY;
-		if (Math.abs(dy) > Math.abs(dx) * 1.2 || Math.abs(dx) < 50) return;
-		if (dx > 0) mobileState.leftOpen = true;
-		else mobileState.leftOpen = false;
+
+	function drawerDragEnd() {
+		dragPending = false;
+		cleanupDocListeners();
+		if (!isDragging) return;
+		isDragging = false;
+		const progress = (drawerTranslate + DRAWER_WIDTH) / DRAWER_WIDTH;
+		const startedOpen = dragBaseTranslate === 0;
+		mobileState.leftOpen = startedOpen ? progress >= 0.75 : progress > 0.25;
+		drawerTranslate = mobileState.leftOpen ? 0 : -DRAWER_WIDTH;
+	}
+
+	function cleanupDocListeners() {
+		document.removeEventListener('touchmove', drawerDragMove);
+		document.removeEventListener('touchend', drawerDragEnd);
+		document.removeEventListener('touchcancel', drawerDragEnd);
+	}
+
+	function drawerDragStart(e: TouchEvent) {
+		if (!mobileState.isMobile || isDragging || dragPending || mobileState.rightOpen) return;
+		dragStartX = e.touches[0].clientX;
+		dragStartY = e.touches[0].clientY;
+		dragBaseTranslate = mobileState.leftOpen ? 0 : -DRAWER_WIDTH;
+		dragPending = true;
+		document.addEventListener('touchmove', drawerDragMove, { passive: false });
+		document.addEventListener('touchend', drawerDragEnd);
+		document.addEventListener('touchcancel', drawerDragEnd);
 	}
 
 	// Redirect if not authenticated
@@ -158,8 +219,7 @@
 	<div
 		class="flex overflow-hidden bg-discord-background"
 		style="height: 100dvh;"
-		ontouchstart={onSwipeTouchStart}
-		ontouchend={onSwipeTouchEnd}
+		ontouchstart={drawerDragStart}
 	>
 		<!-- Sync state banner -->
 		{#if auth.syncState !== 'PREPARED' && auth.syncState !== 'SYNCING'}
@@ -178,11 +238,19 @@
 			<!-- Desktop: permanent sidebars -->
 			<SpaceSidebar onHomeClick={() => setActiveSpace(null)} onSettingsClick={() => showSettings = !showSettings} />
 			<RoomList onLogout={handleLogout} />
-		{:else if mobileState.leftOpen}
-			<!-- Mobile: left drawer -->
+		{:else}
+			<!-- Mobile: animated drawer + backdrop -->
 			<!-- svelte-ignore a11y_click_events_have_key_events -->
-			<div class="fixed inset-0 z-30 bg-black/50" onclick={() => mobileState.leftOpen = false}></div>
-			<div class="fixed inset-y-0 left-0 z-40 flex shadow-2xl">
+			<div
+				class="fixed inset-0 z-30"
+				style="background: rgba(0,0,0,{backdropOpacity}); pointer-events: {backdropOpacity > 0.01 ? 'auto' : 'none'};"
+				ontouchstart={drawerDragStart}
+				onclick={() => { if (!isDragging) mobileState.leftOpen = false; }}
+			></div>
+			<div
+				class="fixed inset-y-0 left-0 z-40 flex"
+				style="transform: translateX({drawerTranslate}px); {isDragging ? '' : 'transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);'} {drawerTranslate <= -DRAWER_WIDTH ? '' : 'box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);'}"
+			>
 				<SpaceSidebar
 					onHomeClick={() => { setActiveSpace(null); mobileState.leftOpen = false; }}
 					onSettingsClick={() => { showSettings = !showSettings; mobileState.leftOpen = false; }}

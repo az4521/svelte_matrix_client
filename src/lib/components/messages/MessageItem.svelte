@@ -14,6 +14,7 @@
 	import { format } from 'date-fns';
 	import { renderHtml } from '$lib/utils/twemoji';
 	import { isFavouriteGif, addFavouriteGif, removeFavouriteGif, favouritesState } from '$lib/stores/favourites.svelte';
+	import { mobileState } from '$lib/stores/mobile.svelte';
 
 	interface Props {
 		event: MatrixEvent;
@@ -28,6 +29,7 @@
 
 	let showEmojiPicker = $state(false);
 	let confirmingDelete = $state(false);
+
 	let deleteConfirmFocus = $state<'yes' | 'no'>('yes');
 	let deleteYesEl = $state<HTMLButtonElement | undefined>();
 	let deleteNoEl = $state<HTMLButtonElement | undefined>();
@@ -71,6 +73,7 @@
 
 	const reactionTick = $derived(messagesState.reactionTick);
 	const eventId = $derived(event.getId() ?? '');
+	const mobileSelected = $derived(mobileState.isMobile && mobileState.selectedMessageId === eventId);
 	const isOwnMessage = $derived(event.getSender() === auth.userId);
 	const isEdited = $derived.by(() => { reactionTick; return !!event.replacingEvent(); });
 
@@ -141,6 +144,12 @@
 		if (thumbnailMxc && (w > 800 || h > 600)) {
 			return mxcToHttp(thumbnailMxc) ?? mxcToHttp(content?.url as string);
 		}
+		return mxcToHttp(content?.url as string);
+	});
+
+	// Video URL
+	const videoHttpUrl = $derived(() => {
+		if (msgtype !== 'm.video') return null;
 		return mxcToHttp(content?.url as string);
 	});
 
@@ -294,16 +303,19 @@
 </script>
 
 {#if showEmojiPicker}
-	<!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<div class="fixed inset-0 z-40" onclick={() => (showEmojiPicker = false)}></div>
+	<div class="fixed inset-0 z-40" onclick={() => { showEmojiPicker = false; mobileState.selectedMessageId = null; }}></div>
 {/if}
 <!-- svelte-ignore a11y_no_static_element_interactions -->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
 	bind:this={rootEl}
-	class="group relative flex gap-3 px-4 py-0.5 hover:bg-discord-messageHover rounded transition-colors"
+	class="{mobileState.isMobile ? '' : 'group hover:bg-discord-messageHover'} relative flex gap-3 px-4 py-0.5 rounded transition-colors"
 	class:pt-3={showHeader}
+	class:bg-discord-messageHover={mobileSelected}
 	onmouseleave={() => { if (!confirmingDelete) return; }}
+	onclick={() => { if (mobileState.isMobile) mobileState.selectedMessageId = mobileSelected ? null : eventId; }}
 >
 	<!-- Avatar column -->
 	<div class="w-10 flex-shrink-0 mt-0.5">
@@ -392,7 +404,21 @@
 			{:else}
 				<span class="text-xs text-discord-textMuted italic">[Image unavailable]</span>
 			{/if}
-		{:else if msgtype === 'm.file'}
+		{:else if msgtype === 'm.video'}
+		{@const src = mediaStore.resolve(videoHttpUrl())}
+		{#if src}
+			<video
+				{src}
+				controls
+				class="max-w-sm w-full max-h-72 rounded-lg mt-1 block"
+				preload="metadata"
+			>
+				<track kind="captions" />
+			</video>
+		{:else}
+			<span class="text-xs text-discord-textMuted italic">[Video unavailable]</span>
+		{/if}
+	{:else if msgtype === 'm.file'}
 			<div class="flex items-center gap-2 p-3 bg-discord-backgroundSecondary rounded-lg mt-1 max-w-sm w-full">
 				<svg class="w-8 h-8 text-discord-accent flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
 					<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
@@ -472,7 +498,7 @@
 	</div>
 
 	<!-- Hover action bar: always visible when emoji picker is open, otherwise on group-hover -->
-	<div class="{showEmojiPicker || confirmingDelete ? 'flex' : 'hidden group-hover:flex'} absolute right-4 top-0 -translate-y-1/2 items-center gap-1 bg-discord-backgroundSecondary border border-discord-divider rounded-lg px-1 py-0.5 shadow-md z-50">
+	<div class="{showEmojiPicker || confirmingDelete || mobileSelected ? 'flex' : 'hidden group-hover:flex'} absolute right-4 top-0 -translate-y-1/2 items-center gap-1 bg-discord-backgroundSecondary border border-discord-divider rounded-lg px-1 py-0.5 shadow-md z-20">
 		{#if isOwnMessage && eventType === 'm.room.message' && msgtype === 'm.text'}
 			<button
 				onclick={startEdit}
@@ -523,7 +549,7 @@
 				title="Add reaction"
 			>
 				<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-					<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 13.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm5 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm2.16-5.12A5.507 5.507 0 0 0 12 8c-2.05 0-3.84 1.12-4.81 2.78-.18.31.06.72.42.72h8.79c.36 0 .6-.41.42-.72-.01 0-.01-.01-.02-.01-.18-.31-.42-.6-.64-.11z"/>
+					<path fill-rule="evenodd" d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zM8.5 8a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM15.5 8a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM6.89 13.5h10.22c-.8 2.04-2.78 3.5-5.11 3.5s-4.31-1.46-5.11-3.5z"/>
 				</svg>
 			</button>
 			{#if showEmojiPicker}
