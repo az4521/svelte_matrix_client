@@ -70,6 +70,13 @@
 	style={mobileState.isMobile ? 'max-height: 50dvh;' : 'max-height: 380px;'}
 	onkeydown={onKeydown}
 >
+	{#if mobileState.isMobile}
+		<div class="flex border-b border-discord-divider flex-shrink-0">
+			{#if onSwitchToEmoji}<button onclick={onSwitchToEmoji} class="flex-1 py-2 text-sm font-medium text-discord-textMuted hover:text-discord-textPrimary transition-colors">Emoji</button>{/if}
+			{#if onSwitchToSticker}<button onclick={onSwitchToSticker} class="flex-1 py-2 text-sm font-medium text-discord-textMuted hover:text-discord-textPrimary transition-colors">Stickers</button>{/if}
+			<button class="flex-1 py-2 text-sm font-semibold text-discord-textPrimary border-b-2 border-discord-accent">GIFs</button>
+		</div>
+	{/if}
 	<!-- Search -->
 	<div class="px-3 pt-3 pb-2 flex-shrink-0">
 		<input

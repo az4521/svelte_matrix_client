@@ -397,7 +397,7 @@
 			<button
 				onclick={() => openPicker('gif')}
 				{disabled}
-				class="p-1.5 rounded text-discord-textMuted hover:text-discord-textPrimary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+				class="{mobileState.isMobile ? 'hidden' : ''} p-1.5 rounded text-discord-textMuted hover:text-discord-textPrimary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
 				title="Favourite GIFs"
 			>
 				<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -423,7 +423,7 @@
 		<div class="relative flex-shrink-0">
 			<button
 				onclick={() => openPicker('sticker')}
-				class="p-1.5 rounded text-discord-textMuted hover:text-discord-textPrimary transition-colors"
+				class="{mobileState.isMobile ? 'hidden' : ''} p-1.5 rounded text-discord-textMuted hover:text-discord-textPrimary transition-colors"
 				title="Stickers"
 				{disabled}
 			>

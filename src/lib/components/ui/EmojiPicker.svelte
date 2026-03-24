@@ -242,6 +242,13 @@
 	onkeydown={onKeydown}
 	onwheel={(e) => e.stopPropagation()}
 >
+	{#if mobileState.isMobile && (onSwitchToSticker || onSwitchToGif)}
+		<div class="flex border-b border-discord-divider flex-shrink-0">
+			<button class="flex-1 py-2 text-sm font-semibold text-discord-textPrimary border-b-2 border-discord-accent">Emoji</button>
+			{#if onSwitchToSticker}<button onclick={onSwitchToSticker} class="flex-1 py-2 text-sm font-medium text-discord-textMuted hover:text-discord-textPrimary transition-colors">Stickers</button>{/if}
+			{#if onSwitchToGif}<button onclick={onSwitchToGif} class="flex-1 py-2 text-sm font-medium text-discord-textMuted hover:text-discord-textPrimary transition-colors">GIFs</button>{/if}
+		</div>
+	{/if}
 	<!-- Search -->
 	<div class="px-3 pt-3 pb-2 flex-shrink-0">
 		<input

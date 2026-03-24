@@ -30,6 +30,18 @@
 	let showEmojiPicker = $state(false);
 	let confirmingDelete = $state(false);
 
+	let keyboardOffset = $state(0);
+	$effect(() => {
+		if (!mobileState.isMobile) { keyboardOffset = 0; return; }
+		const vv = window.visualViewport;
+		if (!vv) return;
+		const update = () => { keyboardOffset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop); };
+		vv.addEventListener('resize', update);
+		vv.addEventListener('scroll', update);
+		update();
+		return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); };
+	});
+
 	let deleteConfirmFocus = $state<'yes' | 'no'>('yes');
 	let deleteYesEl = $state<HTMLButtonElement | undefined>();
 	let deleteNoEl = $state<HTMLButtonElement | undefined>();
@@ -306,6 +318,23 @@
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<div class="fixed inset-0 z-40" onclick={() => { showEmojiPicker = false; mobileState.selectedMessageId = null; }}></div>
+	{#if mobileState.isMobile}
+		<div class="fixed left-0 right-0 z-50" style="bottom: {keyboardOffset}px;">
+			<EmojiPicker
+				onSelect={async (emoji) => {
+					await sendReaction(room.roomId, eventId, emoji);
+					showEmojiPicker = false;
+					mobileState.selectedMessageId = null;
+				}}
+				onSelectCustom={async (emoji) => {
+					await sendReaction(room.roomId, eventId, emoji.mxcUrl);
+					showEmojiPicker = false;
+					mobileState.selectedMessageId = null;
+				}}
+				onClose={() => { showEmojiPicker = false; mobileState.selectedMessageId = null; }}
+			/>
+		</div>
+	{/if}
 {/if}
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -557,7 +586,7 @@
 					<path fill-rule="evenodd" d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zM8.5 8a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM15.5 8a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM6.89 13.5h10.22c-.8 2.04-2.78 3.5-5.11 3.5s-4.31-1.46-5.11-3.5z"/>
 				</svg>
 			</button>
-			{#if showEmojiPicker}
+			{#if showEmojiPicker && !mobileState.isMobile}
 				<div class={emojiPickerBelow ? 'absolute top-full right-0 mt-1 z-50' : 'absolute bottom-full right-0 mb-1 z-50'}>
 					<EmojiPicker
 						onSelect={async (emoji) => {
