@@ -3,14 +3,52 @@
 This is my first test of Claude Code, creating a matrix client. every existing matrix client sucks, so being better than them isn't really a high bar. imo initial commit has already achieved this
 
 things left to do:
-- account registration
-- account management
-- functionality for creating or moderating rooms/spaces
-- anything to do with encryption
-- video and audio embeds (waiting on tuwunel to fix this first tho, i don't wanna spin up my own opengraph proxy service)
-- voice and video calls, screen sharing
-- configuration / theming / whatever
-- no idea, let me know if something's missing
+
+Messaging
+
+- Read receipts — showing who has read up to which message
+- Message search
+- Threads/replies as collapsible threads
+- Voice messages (m.audio recording)
+- Notifications
+- Push notifications (via a push gateway/service worker)
+- Creating direct messages
+- Message forwarding
+- Polls (m.poll / MSC3381)
+
+Rooms
+
+- Creating rooms
+- Initiating room upgrades
+- Room directory / public room search
+- Knock to join (requesting access to invite-only rooms)
+- Join via link (for joining public rooms)
+- Per-room notification settings (all messages, mentions only, muted)
+- Notification badge on browser tab (favicon)
+- Moderation (kick/ban/deleting messages)
+- Nested spaces
+- matrix.to / matrix: URI link handling
+
+User
+
+- User profile editing (display name, avatar)
+- User info panel when clicking a member (profile, shared rooms, DM button)
+- Presence (online/away/offline status)
+- Ignore/block users
+- SSO / OAuth login
+- Device/session management
+- Account settings (password change, deactivation)
+
+Encryption
+
+- E2EE
+- Device verification
+- Key backup
+
+Media
+
+- Audio/video calling (WebRTC)
+- Better URL previews (Blocked by Tuwunel)
 
 feel free to try it out :) i host a copy at https://matrix.crafty.moe/
 
