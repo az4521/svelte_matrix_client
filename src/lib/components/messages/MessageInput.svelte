@@ -16,9 +16,10 @@
 		replyToEvent?: MatrixEvent | null;
 		onCancelReply?: () => void;
 		onRequestEditLast?: () => void;
+		scrollEl?: HTMLElement;
 	}
 
-	let { roomId, roomName, room, disabled = false, replyToEvent = null, onCancelReply, onRequestEditLast }: Props = $props();
+	let { roomId, roomName, room, disabled = false, replyToEvent = null, onCancelReply, onRequestEditLast, scrollEl }: Props = $props();
 
 	interface QueuedFile {
 		file: File;
@@ -177,6 +178,10 @@
 	}
 
 	function onKeydown(e: KeyboardEvent) {
+		if ((e.key === 'PageUp' || e.key === 'PageDown') && scrollEl) {
+			e.preventDefault();
+			scrollEl.scrollBy({ top: e.key === 'PageUp' ? -scrollEl.clientHeight * 0.85 : scrollEl.clientHeight * 0.85, behavior: 'smooth' });
+		}
 		if (e.key === 'Enter' && !e.shiftKey && !mobileState.isMobile) {
 			e.preventDefault();
 			send();

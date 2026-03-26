@@ -617,6 +617,7 @@
 			roomName={roomName}
 			{room}
 			{replyToEvent}
+			scrollEl={scrollEl}
 			onCancelReply={() => { replyToEvent = null; }}
 			onRequestEditLast={requestEditLastMessage}
 		/>
