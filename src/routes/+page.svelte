@@ -3,8 +3,9 @@
 	import { goto } from '$app/navigation';
 	import { login, register, reconnect, startSync, initServiceWorker } from '$lib/matrix/client';
 	import { auth, saveSession, loadStoredSession } from '$lib/stores/auth.svelte';
+	import { DEFAULT_HOMESERVER } from '$lib/config';
 
-	let homeserverUrl = $state('https://matrix.crafty.moe');
+	let homeserverUrl = $state(DEFAULT_HOMESERVER);
 	let username = $state('');
 	let password = $state('');
 	let registrationToken = $state('');
@@ -155,7 +156,7 @@
 						id="server"
 						type="text"
 						bind:value={homeserverUrl}
-						placeholder="https://matrix.crafty.moe"
+						placeholder={DEFAULT_HOMESERVER}
 						disabled={isLoading}
 						class="w-full px-3 py-2.5 bg-discord-backgroundSecondary text-discord-textPrimary placeholder-discord-textMuted rounded border border-discord-divider focus:border-discord-accent focus:outline-none transition-colors disabled:opacity-60 text-sm"
 						required
@@ -171,7 +172,7 @@
 						id="username"
 						type="text"
 						bind:value={username}
-						placeholder={mode === 'login' ? '@you:matrix.crafty.moe' : 'yourusername'}
+						placeholder={mode === 'login' ? `@you:${new URL(DEFAULT_HOMESERVER).hostname}` : 'yourusername'}
 						disabled={isLoading}
 						class="w-full px-3 py-2.5 bg-discord-backgroundSecondary text-discord-textPrimary placeholder-discord-textMuted rounded border border-discord-divider focus:border-discord-accent focus:outline-none transition-colors disabled:opacity-60 text-sm"
 						required

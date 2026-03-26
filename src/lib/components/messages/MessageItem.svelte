@@ -11,6 +11,7 @@
 	import { messagesState, bumpReactionTick } from '$lib/stores/messages.svelte';
 	import { roomsState } from '$lib/stores/rooms.svelte';
 	import { auth } from '$lib/stores/auth.svelte';
+	import { INLINE_MEDIA_HOSTNAMES } from '$lib/config';
 	import { tick } from 'svelte';
 	import { format } from 'date-fns';
 	import { renderHtml } from '$lib/utils/twemoji';
@@ -256,12 +257,45 @@
 		content?.['m.relates_to']?.rel_type === 'm.thread'
 	);
 
+	// Extract configured inline-media hostnames from both plain body and <a href> in formatted body
+	const inlineMediaUrls = $derived.by(() => {
+		if (msgtype !== 'm.text') return [];
+		const seen = new Set<string>();
+		const urls: string[] = [];
+		const add = (url: string) => {
+			try {
+				if (INLINE_MEDIA_HOSTNAMES.includes(new URL(url).hostname) && !seen.has(url)) {
+					seen.add(url); urls.push(url);
+				}
+			} catch {}
+		};
+		(body().match(/https?:\/\/[^\s<>"')\]]+/g) ?? []).forEach(add);
+		const fb = formattedBody();
+		if (fb) {
+			const hrefRe = /href="([^"]+)"/g;
+			let m;
+			while ((m = hrefRe.exec(fb)) !== null) add(m[1]);
+		}
+		return urls;
+	});
+
+	function inlineMediaType(url: string): 'image' | 'video' | 'audio' | null {
+		try {
+			const path = new URL(url).pathname.toLowerCase();
+			if (/\.(jpe?g|png|gif|webp|avif|heic?|bmp)$/.test(path)) return 'image';
+			if (/\.(mp4|webm|mov|avi|mkv|m4v)$/.test(path)) return 'video';
+			if (/\.(mp3|ogg|wav|flac|aac|m4a|caf|opus)$/.test(path)) return 'audio';
+		} catch {}
+		return null;
+	}
+
 	// Extract http/https URLs from the plain body for inline media previews
 	const linkedUrls = $derived.by(() => {
 		if (msgtype !== 'm.text') return [];
+		const inlineSet = new Set(inlineMediaUrls);
 		const matches = body().match(/https?:\/\/[^\s<>"')\]]+/g) ?? [];
-		// Deduplicate while preserving order
-		return [...new Set(matches)];
+		// Deduplicate while preserving order; exclude inline media URLs (rendered separately)
+		return [...new Set(matches)].filter(u => !inlineSet.has(u));
 	});
 
 	// True if the body text consists entirely of emoji + whitespace (no other characters)
@@ -624,6 +658,18 @@
 				</div>
 				{#each linkedUrls as url (url)}
 					<LinkPreview {url} />
+				{/each}
+				{#each inlineMediaUrls as url (url)}
+					{@const mediaType = inlineMediaType(url)}
+					{#if mediaType === 'image'}
+						<img src={url} alt="" class="max-w-sm w-full max-h-72 rounded-lg mt-1 block object-contain bg-black/10" />
+					{:else if mediaType === 'video'}
+						<!-- svelte-ignore a11y_media_has_caption -->
+						<video src={url} controls class="max-w-sm w-full max-h-72 rounded-lg mt-1 block"></video>
+					{:else if mediaType === 'audio'}
+						<!-- svelte-ignore a11y_media_has_caption -->
+						<audio src={url} controls class="w-full mt-1"></audio>
+					{/if}
 				{/each}
 			{/if}
 		{/if}

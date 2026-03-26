@@ -2,6 +2,7 @@
 	import { getUrlPreview, type UrlPreview } from '$lib/matrix/client';
 	import Lightbox from '$lib/components/ui/Lightbox.svelte';
 	import { favouritesState, isFavouriteGif, addFavouriteGif, removeFavouriteGif } from '$lib/stores/favourites.svelte';
+	import { IG_PROXY } from '$lib/config';
 
 
 	interface Props {
@@ -72,7 +73,6 @@
 		return null;
 	}
 
-	const IG_PROXY = 'https://matrix.crafty.moe/igproxy';
 
 	function getInstagramProxyUrl(rawUrl: string): string | null {
 		try {
@@ -130,7 +130,7 @@
 			return;
 		}
 
-		// Instagram: fetch OG tags via CORS proxy at matrix.crafty.moe/igproxy
+		// Instagram: fetch OG tags via CORS proxy
 		const igProxyUrl = getInstagramProxyUrl(currentUrl);
 		if (igProxyUrl) {
 			fetchOgTags(igProxyUrl).then(tags => {
