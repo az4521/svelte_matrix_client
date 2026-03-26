@@ -262,6 +262,42 @@ export function getTimelineMessages(room: Room): MatrixEvent[] {
 }
 
 
+async function captureVideoThumbnail(file: File): Promise<{
+	blob: Blob; w: number; h: number; thumbW: number; thumbH: number;
+} | null> {
+	return new Promise((resolve) => {
+		const objectUrl = URL.createObjectURL(file);
+		const video = document.createElement('video');
+		video.preload = 'metadata';
+		video.muted = true;
+		video.playsInline = true;
+		const cleanup = () => URL.revokeObjectURL(objectUrl);
+		video.onerror = () => { cleanup(); resolve(null); };
+		video.onloadedmetadata = () => {
+			// Seek to 10% into the video (or 1s, whichever is smaller) to get past black frames
+			video.currentTime = Math.min(1, video.duration * 0.1);
+		};
+		video.onseeked = () => {
+			const w = video.videoWidth;
+			const h = video.videoHeight;
+			const MAX = 800;
+			const scale = Math.min(1, MAX / Math.max(w, h));
+			const thumbW = Math.round(w * scale);
+			const thumbH = Math.round(h * scale);
+			const canvas = document.createElement('canvas');
+			canvas.width = thumbW;
+			canvas.height = thumbH;
+			canvas.getContext('2d')!.drawImage(video, 0, 0, thumbW, thumbH);
+			canvas.toBlob((blob) => {
+				cleanup();
+				if (blob) resolve({ blob, w, h, thumbW, thumbH });
+				else resolve(null);
+			}, 'image/jpeg', 0.85);
+		};
+		video.src = objectUrl;
+	});
+}
+
 export async function sendFile(roomId: string, file: File): Promise<void> {
 	if (!matrixClient) throw new Error('Not logged in');
 	const { content_uri } = await matrixClient.uploadContent(file, { name: file.name });
@@ -269,11 +305,26 @@ export async function sendFile(roomId: string, file: File): Promise<void> {
 	const isVideo = file.type.startsWith('video/');
 	const isAudio = file.type.startsWith('audio/');
 	const msgtype = isImage ? 'm.image' : isVideo ? 'm.video' : isAudio ? 'm.audio' : 'm.file';
+
+	const info: Record<string, unknown> = { mimetype: file.type, size: file.size };
+
+	if (isVideo) {
+		const thumb = await captureVideoThumbnail(file);
+		if (thumb) {
+			const thumbFile = new File([thumb.blob], 'thumbnail.jpg', { type: 'image/jpeg' });
+			const { content_uri: thumb_uri } = await matrixClient.uploadContent(thumbFile, { name: 'thumbnail.jpg' });
+			info.w = thumb.w;
+			info.h = thumb.h;
+			info.thumbnail_url = thumb_uri;
+			info.thumbnail_info = { mimetype: 'image/jpeg', w: thumb.thumbW, h: thumb.thumbH, size: thumb.blob.size };
+		}
+	}
+
 	await matrixClient.sendMessage(roomId, {
 		msgtype,
 		body: file.name,
 		url: content_uri,
-		info: { mimetype: file.type, size: file.size }
+		info,
 	} as never);
 }
 
@@ -296,16 +347,28 @@ export async function sendFormattedMessage(
 	} as never);
 }
 
-export function mxcToHttp(mxcUrl: string | null | undefined, size = 0): string | null {
+export function mxcToHttp(mxcUrl: string | null | undefined, width = 0, height: number | undefined = undefined, method='crop'): string | null {
 	if (!matrixClient || !mxcUrl?.startsWith('mxc://')) return null;
 	const match = mxcUrl.match(/^mxc:\/\/([^/]+)\/(.+)$/);
 	if (!match) return null;
 	const [, serverName, mediaId] = match;
 	const baseUrl = matrixClient.getHomeserverUrl();
-	if (size > 0) {
-		return `${baseUrl}/_matrix/client/v1/media/thumbnail/${serverName}/${mediaId}?width=${size}&height=${size}&method=crop`;
+	if (width > 0) {
+		height = height ?? width
+		return `${baseUrl}/_matrix/client/v1/media/thumbnail/${serverName}/${mediaId}?width=${width}&height=${height}&method=${method}`;
 	}
 	return `${baseUrl}/_matrix/client/v1/media/download/${serverName}/${mediaId}`;
+}
+
+/** Fetch a video from the homeserver with auth and return an object URL for use in <video src>. */
+export async function fetchVideoBlob(httpUrl: string): Promise<string> {
+	const token = matrixClient?.getAccessToken();
+	const headers: Record<string, string> = {};
+	if (token) headers['Authorization'] = `Bearer ${token}`;
+	const resp = await fetch(httpUrl, { headers });
+	if (!resp.ok) throw new Error(`Failed to fetch video: ${resp.status}`);
+	const blob = await resp.blob();
+	return URL.createObjectURL(blob);
 }
 
 /** HEAD-request a URL (with auth for homeserver URLs) and return its Content-Type. */

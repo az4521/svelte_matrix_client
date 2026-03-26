@@ -5,7 +5,7 @@
 	import Reactions from '$lib/components/messages/Reactions.svelte';
 	import LinkPreview from '$lib/components/messages/LinkPreview.svelte';
 	import Lightbox from '$lib/components/ui/Lightbox.svelte';
-	import { getMemberName, getMemberAvatar, mxcToHttp, findEventById, sendReaction, sendEdit, deleteMessage, getMyPowerLevel, getRoomPowerLevels, getPinnedEventIds, pinMessage, unpinMessage } from '$lib/matrix/client';
+	import { getMemberName, getMemberAvatar, mxcToHttp, fetchVideoBlob, findEventById, sendReaction, sendEdit, deleteMessage, getMyPowerLevel, getRoomPowerLevels, getPinnedEventIds, pinMessage, unpinMessage } from '$lib/matrix/client';
 	import { parseMarkdown } from '$lib/utils/markdown';
 
 	import { messagesState, bumpReactionTick } from '$lib/stores/messages.svelte';
@@ -181,10 +181,48 @@
 		return mxcToHttp(content?.url as string);
 	});
 
-	// Video URL
-	const videoHttpUrl = $derived(() => {
-		if (msgtype !== 'm.video') return null;
-		return mxcToHttp(content?.url as string);
+	// Video: lazy-load blob only after thumbnail is clicked
+	let videoClicked = $state(false);
+	let videoBlobUrl = $state<string | null>(null);
+	let videoLoading = $state(false);
+	let videoThumbFailed = $state(false);
+	const videoThumbnailUrl = $derived(
+		msgtype === 'm.video'
+			? (mxcToHttp((content?.info as any)?.thumbnail_url as string) ?? mxcToHttp(content?.url as string, 640, 480, 'scale'))
+			: null
+	);
+
+	$effect(() => {
+		if (!videoClicked || msgtype !== 'm.video') return;
+		const httpUrl = mxcToHttp(content?.url as string);
+		if (!httpUrl) return;
+		videoLoading = true;
+		let objectUrl: string | null = null;
+		fetchVideoBlob(httpUrl).then((url) => {
+			objectUrl = url;
+			videoBlobUrl = url;
+			videoLoading = false;
+		}).catch(() => { videoLoading = false; });
+		return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); videoBlobUrl = null; };
+	});
+
+	// Audio: lazy-load blob only after play is clicked
+	let audioClicked = $state(false);
+	let audioBlobUrl = $state<string | null>(null);
+	let audioLoading = $state(false);
+
+	$effect(() => {
+		if (!audioClicked || msgtype !== 'm.audio') return;
+		const httpUrl = mxcToHttp(content?.url as string);
+		if (!httpUrl) return;
+		audioLoading = true;
+		let objectUrl: string | null = null;
+		fetchVideoBlob(httpUrl).then((url) => {
+			objectUrl = url;
+			audioBlobUrl = url;
+			audioLoading = false;
+		}).catch(() => { audioLoading = false; });
+		return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); audioBlobUrl = null; };
 	});
 
 	// Whether this uploaded image is a GIF (eligible for favouriting)
@@ -462,19 +500,76 @@
 				<span class="text-xs text-discord-textMuted italic">[Image unavailable]</span>
 			{/if}
 		{:else if msgtype === 'm.video'}
-		{@const src = videoHttpUrl()}
-		{#if src}
+		{#if videoBlobUrl}
+			<!-- svelte-ignore a11y_media_has_caption -->
 			<video
-				{src}
+				src={videoBlobUrl}
 				controls
+				autoplay
 				class="max-w-sm w-full max-h-72 rounded-lg mt-1 block"
-				preload="metadata"
-			>
-				<track kind="captions" />
-			</video>
+			></video>
 		{:else}
-			<span class="text-xs text-discord-textMuted italic">[Video unavailable]</span>
+			<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+			<div
+				class="relative max-w-sm w-full mt-1 rounded-lg overflow-hidden cursor-pointer group bg-black"
+				style="{videoThumbnailUrl && !videoThumbFailed ? `aspect-ratio: ${(content?.info as any)?.w && (content?.info as any)?.h ? `${(content.info as any).w}/${(content.info as any).h}` : '16/9'}; max-height: 18rem;` : ''}"
+				onclick={() => { videoClicked = true; }}
+			>
+				{#if videoThumbnailUrl && !videoThumbFailed}
+					<img src={videoThumbnailUrl} alt="" class="w-full h-full object-cover" onerror={() => videoThumbFailed = true} />
+					<div class="absolute inset-0 flex flex-col items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors">
+						{#if videoLoading}
+							<div class="w-12 h-12 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+						{:else}
+							<div class="w-14 h-14 rounded-full bg-black/60 flex items-center justify-center">
+								<svg class="w-7 h-7 text-white ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+							</div>
+						{/if}
+						<p class="mt-2 text-xs text-white font-medium drop-shadow px-2 py-1 text-center line-clamp-1 rounded-full bg-black/60">{content?.body ?? ''}</p>
+					</div>
+				{:else}
+					<div class="flex items-center gap-3 px-4 py-3 bg-discord-backgroundTertiary group-hover:bg-discord-messageHover transition-colors rounded-lg">
+						<div class="w-10 h-10 rounded-full bg-discord-accent flex items-center justify-center flex-shrink-0">
+							{#if videoLoading}
+								<div class="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+							{:else}
+								<svg class="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+							{/if}
+						</div>
+						<div class="min-w-0">
+							<p class="text-sm font-medium text-discord-textPrimary truncate">{content?.body ?? 'Video'}</p>
+							<p class="text-xs text-discord-textMuted">{videoLoading ? 'Loading…' : 'Click to play'}</p>
+						</div>
+					</div>
+				{/if}
+			</div>
 		{/if}
+	{:else if msgtype === 'm.audio'}
+		<div class="flex items-center gap-3 p-3 bg-discord-backgroundTertiary rounded-lg mt-1 max-w-sm w-full">
+			<!-- svelte-ignore a11y_consider_explicit_label -->
+			<button
+				onclick={() => { if (!audioBlobUrl) audioClicked = true; }}
+				class="w-8 h-8 rounded-full bg-discord-accent flex-shrink-0 flex items-center justify-center disabled:opacity-50"
+				disabled={audioLoading}
+			>
+				{#if audioLoading}
+					<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+				{:else if !audioBlobUrl}
+					<svg class="w-4 h-4 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+				{:else}
+					<svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>
+				{/if}
+			</button>
+			<div class="flex-1 min-w-0">
+				<p class="text-discord-textPrimary text-xs font-medium truncate mb-1">{content?.body ?? 'Audio'}</p>
+				{#if audioBlobUrl}
+					<!-- svelte-ignore a11y_media_has_caption -->
+					<audio controls autoplay src={audioBlobUrl} class="w-full h-8"></audio>
+				{:else}
+					<p class="text-discord-textMuted text-xs">{audioLoading ? 'Loading…' : 'Click to play'}</p>
+				{/if}
+			</div>
+		</div>
 	{:else if msgtype === 'm.file'}
 			<div class="flex items-center gap-2 p-3 bg-discord-backgroundSecondary rounded-lg mt-1 max-w-sm w-full">
 				<svg class="w-8 h-8 text-discord-accent flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">

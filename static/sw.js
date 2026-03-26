@@ -105,12 +105,11 @@ self.addEventListener('fetch', (event) => {
 
 			const headers = new Headers(event.request.headers);
 			headers.set('Authorization', `Bearer ${accessToken}`);
-			return fetch(new Request(url, {
+			return fetch(url, {
 				method: event.request.method,
 				headers,
-				mode: 'cors',
-				credentials: 'omit',
-			}));
+				cache: 'default',
+			});
 		}).catch(() => fetch(event.request))
 	);
 });
