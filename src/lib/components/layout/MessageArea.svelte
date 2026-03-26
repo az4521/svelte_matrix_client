@@ -19,8 +19,10 @@
 		getRoomTopic,
 		sendReadReceipt,
 		getTombstone,
-		joinRoom
+		joinRoom,
+		getRoom
 	} from '$lib/matrix/client';
+	import { setActiveRoom } from '$lib/stores/rooms.svelte';
 	import { getMessages, setMessages, appendMessage, canLoadMore, setCanLoadMore, bumpReactionTick } from '$lib/stores/messages.svelte';
 	import { bumpUnreadTick } from '$lib/stores/rooms.svelte';
 	import { mobileState } from '$lib/stores/mobile.svelte';
@@ -90,12 +92,20 @@
 	let joiningUpgrade = $state(false);
 
 	const tombstone = $derived(getTombstone(room));
+	const replacementAlreadyJoined = $derived(
+		tombstone ? getRoom(tombstone.replacementRoomId)?.getMyMembership() === 'join' : false
+	);
 
 	async function joinUpgrade() {
 		if (!tombstone) return;
+		if (replacementAlreadyJoined) {
+			setActiveRoom(tombstone.replacementRoomId);
+			return;
+		}
 		joiningUpgrade = true;
 		try {
 			await joinRoom(tombstone.replacementRoomId);
+			setActiveRoom(tombstone.replacementRoomId);
 		} catch (e) {
 			console.error('Failed to join replacement room', e);
 		} finally {
@@ -478,25 +488,25 @@
 					onEditDone={() => messageInputEl?.focus()}
 				/>
 			{/each}
-		</div>
 
-		<!-- Room upgrade tombstone banner -->
-		{#if tombstone}
-			<div class="mx-4 mb-2 p-3 rounded-lg bg-discord-backgroundTertiary border border-discord-warning flex items-center gap-3">
-				<svg class="w-5 h-5 text-discord-warning flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
-				<div class="flex-1 min-w-0">
-					<p class="text-sm font-semibold text-discord-textPrimary">This room has been upgraded</p>
-					<p class="text-xs text-discord-textMuted truncate">{tombstone.body}</p>
+			<!-- Room upgrade tombstone banner -->
+			{#if tombstone}
+				<div class="mx-4 mt-2 mb-4 p-3 rounded-lg bg-discord-backgroundTertiary border border-discord-warning flex items-center gap-3">
+					<svg class="w-5 h-5 text-discord-warning flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+					<div class="flex-1 min-w-0">
+						<p class="text-sm font-semibold text-discord-textPrimary">This room has been upgraded</p>
+						<p class="text-xs text-discord-textMuted truncate">{tombstone.body}</p>
+					</div>
+					<button
+						onclick={joinUpgrade}
+						disabled={joiningUpgrade}
+						class="flex-shrink-0 px-3 py-1.5 rounded bg-discord-accent hover:bg-discord-accentHover text-white text-sm font-semibold transition-colors disabled:opacity-50"
+					>
+						{replacementAlreadyJoined ? 'Go to new room' : joiningUpgrade ? 'Joining…' : 'Join new room'}
+					</button>
 				</div>
-				<button
-					onclick={joinUpgrade}
-					disabled={joiningUpgrade}
-					class="flex-shrink-0 px-3 py-1.5 rounded bg-discord-accent hover:bg-discord-accentHover text-white text-sm font-semibold transition-colors disabled:opacity-50"
-				>
-					{joiningUpgrade ? 'Joining…' : 'Join new room'}
-				</button>
-			</div>
-		{/if}
+			{/if}
+		</div>
 
 		<!-- Scroll to bottom button -->
 		{#if !isAtBottom && messages.length > 0}
