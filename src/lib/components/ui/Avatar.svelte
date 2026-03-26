@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { mediaStore } from '$lib/stores/media.svelte';
 	import { AVATAR_PALETTE } from '$lib/utils/colors';
 
 	interface Props {
@@ -12,7 +11,7 @@
 
 	let { src = null, name = '?', size = 40, rounded = 'full', class: extraClass = '' }: Props = $props();
 
-	const resolvedSrc = $derived(mediaStore.resolve(src));
+	const resolvedSrc = $derived(src ?? null);
 
 	const initials = $derived(() => {
 		if (!name) return '?';

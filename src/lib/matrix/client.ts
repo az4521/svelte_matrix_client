@@ -325,24 +325,32 @@ export async function getContentType(url: string): Promise<string | null> {
 	}
 }
 
-/** Fetch a URL with the Matrix Authorization header for homeserver media URLs. */
-export async function fetchMediaWithAuth(url: string): Promise<string | null> {
-	if (!matrixClient) return null;
-	const accessToken = matrixClient.getAccessToken();
-	const baseUrl = matrixClient.getHomeserverUrl();
-	const headers: Record<string, string> = {};
-	if (accessToken && url.startsWith(baseUrl)) {
-		headers.Authorization = `Bearer ${accessToken}`;
-	}
+/** Register the service worker and send it the current auth credentials. */
+export async function initServiceWorker(): Promise<void> {
+	if (!('serviceWorker' in navigator) || !matrixClient) return;
+	const token = matrixClient.getAccessToken();
+	const hsUrl = matrixClient.getHomeserverUrl();
+	if (!token || !hsUrl) return;
 	try {
-		const res = await fetch(url, { headers });
-		if (!res.ok) return null;
-		const blob = await res.blob();
-		return URL.createObjectURL(blob);
-	} catch {
-		return null;
+		await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+		const reg = await navigator.serviceWorker.ready;
+		reg.active?.postMessage({ type: 'SET_AUTH', accessToken: token, homeserverUrl: hsUrl });
+	} catch (e) {
+		console.error('[SW] registration failed', e);
 	}
 }
+
+/** Send updated auth credentials to an already-registered service worker. */
+export function updateServiceWorkerAuth(): void {
+	if (!matrixClient) return;
+	const token = matrixClient.getAccessToken();
+	const hsUrl = matrixClient.getHomeserverUrl();
+	if (!token || !hsUrl) return;
+	navigator.serviceWorker.ready.then((reg) => {
+		reg.active?.postMessage({ type: 'SET_AUTH', accessToken: token, homeserverUrl: hsUrl });
+	}).catch(() => {});
+}
+
 
 export interface UrlPreview {
 	title?: string;

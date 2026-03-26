@@ -2,7 +2,7 @@
 	import type { Room } from 'matrix-js-sdk';
 	import { getReactions, sendReaction, removeReaction, mxcToHttp } from '$lib/matrix/client';
 	import { renderEmoji } from '$lib/utils/twemoji';
-	import { mediaStore } from '$lib/stores/media.svelte';
+
 
 	interface Props {
 		eventId: string;
@@ -67,7 +67,7 @@
 {#if visibleReactions.length > 0}
 	<div class="flex flex-wrap gap-1 mt-1">
 		{#each visibleReactions as group (group.key)}
-			{@const imgSrc = group.key.startsWith('mxc://') ? mediaStore.resolve(mxcToHttp(group.key)) : null}
+			{@const imgSrc = group.key.startsWith('mxc://') ? mxcToHttp(group.key) : null}
 			<button
 				onclick={() => toggleReaction(group.key, group.isMine, group.myEventId)}
 				class="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border transition-colors"

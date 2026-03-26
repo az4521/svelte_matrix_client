@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { login, register, reconnect, startSync } from '$lib/matrix/client';
+	import { login, register, reconnect, startSync, initServiceWorker } from '$lib/matrix/client';
 	import { auth, saveSession, loadStoredSession } from '$lib/stores/auth.svelte';
 
 	let homeserverUrl = $state('https://matrix.crafty.moe');
@@ -24,6 +24,7 @@
 			auth.homeserverUrl = stored.homeserverUrl;
 			auth.accessToken = stored.accessToken;
 			auth.deviceId = stored.deviceId;
+			initServiceWorker();
 
 			let navigated = false;
 		startSync((state) => {
@@ -49,6 +50,7 @@
 			homeserverUrl: result.homeserverUrl
 		});
 
+		initServiceWorker();
 		statusMsg = 'Syncing…';
 		let navigated = false;
 		startSync((state) => {

@@ -11,7 +11,7 @@
 		getRoomMembers, getRoomAvatar, getRoomTopic, mxcToHttp,
 		type SpaceChildEntry,
 	} from '$lib/matrix/client';
-	import { mediaStore } from '$lib/stores/media.svelte';
+
 	import { auth } from '$lib/stores/auth.svelte';
 	import { roomsState } from '$lib/stores/rooms.svelte';
 	import { mobileState } from '$lib/stores/mobile.svelte';
@@ -42,7 +42,7 @@
 	let generalError = $state('');
 	let generalSuccess = $state(false);
 
-	const currentAvatarUrl = $derived(mediaStore.resolve(getRoomAvatar(room)));
+	const currentAvatarUrl = $derived(getRoomAvatar(room));
 
 	async function saveGeneral() {
 		generalError = '';
@@ -566,7 +566,7 @@
 								<div class="flex items-center gap-3 p-2 rounded bg-discord-backgroundTertiary">
 									<div class="w-7 h-7 rounded-full bg-discord-backgroundSecondary flex-shrink-0 overflow-hidden flex items-center justify-center text-xs font-bold text-discord-textMuted">
 										{#if child.avatarUrl}
-											<img src={mediaStore.resolve(child.avatarUrl)} alt="" class="w-full h-full object-cover" />
+											<img src={child.avatarUrl} alt="" class="w-full h-full object-cover" />
 										{:else}
 											{child.name[0]?.toUpperCase() ?? '#'}
 										{/if}

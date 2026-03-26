@@ -7,7 +7,7 @@
 	import Lightbox from '$lib/components/ui/Lightbox.svelte';
 	import { getMemberName, getMemberAvatar, mxcToHttp, findEventById, sendReaction, sendEdit, deleteMessage } from '$lib/matrix/client';
 	import { parseMarkdown } from '$lib/utils/markdown';
-	import { mediaStore } from '$lib/stores/media.svelte';
+
 	import { messagesState, bumpReactionTick } from '$lib/stores/messages.svelte';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { tick } from 'svelte';
@@ -321,7 +321,7 @@
 			.replace(/\son\w+="[^"]*"/g, '')
 			// Convert mxc:// src attributes to HTTP URLs so browsers can load them
 			.replace(/src="(mxc:\/\/[^"]+)"/g, (_match, mxc) => {
-				const http = mediaStore.resolve(mxcToHttp(mxc));
+				const http = mxcToHttp(mxc);
 				return http ? `src="${http}"` : `src=""`;
 			});
 	}
@@ -401,7 +401,7 @@
 
 		<!-- Message body -->
 		{#if eventType === 'm.sticker'}
-			{@const src = mediaStore.resolve(stickerHttpUrl())}
+			{@const src = stickerHttpUrl()}
 			{#if src}
 				<img
 					{src}
@@ -416,7 +416,7 @@
 					{@html withTwemoji(plainToHtml(body()))}
 				</div>
 			{/if}
-			{@const src = mediaStore.resolve(imageHttpUrl())}
+			{@const src = imageHttpUrl()}
 			{#if src}
 				<div class="relative inline-block group/img mt-1">
 					<a href={src} target="_blank" rel="noopener noreferrer" onclick={(e) => { e.preventDefault(); imageLightboxOpen = true; }}>
@@ -452,7 +452,7 @@
 				<span class="text-xs text-discord-textMuted italic">[Image unavailable]</span>
 			{/if}
 		{:else if msgtype === 'm.video'}
-		{@const src = mediaStore.resolve(videoHttpUrl())}
+		{@const src = videoHttpUrl()}
 		{#if src}
 			<video
 				{src}

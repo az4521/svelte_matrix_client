@@ -2,7 +2,7 @@
 	import { getUrlPreview, type UrlPreview } from '$lib/matrix/client';
 	import Lightbox from '$lib/components/ui/Lightbox.svelte';
 	import { favouritesState, isFavouriteGif, addFavouriteGif, removeFavouriteGif } from '$lib/stores/favourites.svelte';
-	import { mediaStore } from '$lib/stores/media.svelte';
+
 
 	interface Props {
 		url: string;
@@ -236,7 +236,7 @@
 							{#if item.type === 'video'}
 								<!-- svelte-ignore a11y_media_has_caption -->
 								<video
-									src={mediaStore.resolveNoReferrer(item.url) ?? undefined}
+									src={item.url}
 									class="w-full max-h-72 object-contain rounded"
 									controls
 									preload="metadata"
@@ -296,9 +296,9 @@
 	{:else if showInline && preview.imageUrl && !imageError}
 		<!-- Direct image embed — same style as uploaded images -->
 		<div class="relative inline-block group/media mt-1">
-			<a href={mediaStore.resolve(preview.imageUrl) ?? preview.imageUrl} target="_blank" rel="noopener noreferrer" onclick={(e) => { e.preventDefault(); lightboxOpen = true; }}>
+			<a href={preview.imageUrl} target="_blank" rel="noopener noreferrer" onclick={(e) => { e.preventDefault(); lightboxOpen = true; }}>
 				<img
-					src={mediaStore.resolve(preview.imageUrl)}
+					src={preview.imageUrl}
 					alt=""
 					class="max-w-sm max-h-72 rounded-lg object-contain cursor-pointer block"
 					loading="lazy"
@@ -322,7 +322,7 @@
 			</button>
 		</div>
 		{#if lightboxOpen}
-			<Lightbox src={mediaStore.resolve(preview.imageUrl) ?? preview.imageUrl} alt="" onClose={() => (lightboxOpen = false)} />
+			<Lightbox src={preview.imageUrl} alt="" onClose={() => (lightboxOpen = false)} />
 		{/if}
 	{:else if !showInline}
 		<!-- Regular link preview card -->
@@ -355,7 +355,7 @@
 					{#if preview.imageUrl && !imageError}
 						<!-- svelte-ignore a11y_click_events_have_key_events -->
 						<img
-							src={mediaStore.resolve(preview.imageUrl)}
+							src={preview.imageUrl}
 							alt={preview.title ?? ''}
 							onerror={() => (imageError = true)}
 							class="max-w-full max-h-72 rounded mt-1 object-contain cursor-pointer"
@@ -366,7 +366,7 @@
 				</div>
 			</a>
 			{#if lightboxOpen && preview.imageUrl}
-				<Lightbox src={mediaStore.resolve(preview.imageUrl) ?? preview.imageUrl} alt="" onClose={() => (lightboxOpen = false)} />
+				<Lightbox src={preview.imageUrl} alt="" onClose={() => (lightboxOpen = false)} />
 			{/if}
 		</div>
 	{/if}
