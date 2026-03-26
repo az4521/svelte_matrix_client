@@ -1,6 +1,6 @@
 # Svelte Matrix Client
 
-This is my first test of Claude Code, creating a matrix client. every existing matrix client sucks, so being better than them isn't really a high bar. imo initial commit has already achieved this
+This is my first test of Claude Code, creating a matrix client. ~~every existing matrix client sucks, so being better than them isn't really a high bar. imo initial commit has already achieved this~~ actually now that i look, cinny is pretty good, but i wanna do this anyway
 
 things left to do:
 
@@ -18,7 +18,7 @@ Messaging
 
 Rooms
 
-- Creating rooms
+- Creating rooms and spaces
 - Initiating room upgrades
 - Room directory / public room search
 - Knock to join (requesting access to invite-only rooms)
