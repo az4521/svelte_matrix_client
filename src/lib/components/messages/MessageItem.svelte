@@ -5,10 +5,11 @@
 	import Reactions from '$lib/components/messages/Reactions.svelte';
 	import LinkPreview from '$lib/components/messages/LinkPreview.svelte';
 	import Lightbox from '$lib/components/ui/Lightbox.svelte';
-	import { getMemberName, getMemberAvatar, mxcToHttp, findEventById, sendReaction, sendEdit, deleteMessage } from '$lib/matrix/client';
+	import { getMemberName, getMemberAvatar, mxcToHttp, findEventById, sendReaction, sendEdit, deleteMessage, getMyPowerLevel, getRoomPowerLevels, getPinnedEventIds, pinMessage, unpinMessage } from '$lib/matrix/client';
 	import { parseMarkdown } from '$lib/utils/markdown';
 
 	import { messagesState, bumpReactionTick } from '$lib/stores/messages.svelte';
+	import { roomsState } from '$lib/stores/rooms.svelte';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { tick } from 'svelte';
 	import { format } from 'date-fns';
@@ -26,6 +27,14 @@
 	}
 
 	let { event, room, showHeader, onReply, editRequested = false, onEditDone }: Props = $props();
+
+	const canPin = $derived.by(() => {
+		const myPl = getMyPowerLevel(room);
+		const pl = getRoomPowerLevels(room);
+		const pinPl = pl.events?.['m.room.pinned_events'] ?? pl.state_default;
+		return myPl >= pinPl;
+	});
+	const isPinned = $derived.by(() => { void roomsState.roomsTick; return getPinnedEventIds(room).includes(eventId); });
 
 	let showEmojiPicker = $state(false);
 	let emojiPickerEl: HTMLDivElement | undefined = $state();
@@ -358,6 +367,7 @@
 	class:bg-discord-messageHover={mobileSelected}
 	onmouseleave={() => { if (!confirmingDelete) return; }}
 	onclick={() => { if (mobileState.isMobile) mobileState.selectedMessageId = mobileSelected ? null : eventId; }}
+	data-event-id={eventId}
 >
 	<!-- Avatar column -->
 	<div class="w-10 flex-shrink-0 mt-0.5">
@@ -583,6 +593,15 @@
 					</svg>
 				</button>
 			{/if}
+		{/if}
+		{#if canPin}
+			<button
+				onclick={() => isPinned ? unpinMessage(room, eventId) : pinMessage(room, eventId)}
+				class="p-1.5 rounded hover:bg-discord-messageHover transition-colors {isPinned ? 'text-discord-accent' : 'text-discord-textMuted hover:text-discord-textPrimary'}"
+				title={isPinned ? 'Unpin message' : 'Pin message'}
+			>
+				<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
+			</button>
 		{/if}
 		<!-- Add reaction -->
 		<div class="relative">

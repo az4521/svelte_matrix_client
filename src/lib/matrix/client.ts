@@ -1,5 +1,5 @@
-import { createClient, ClientEvent, RoomEvent, RoomMemberEvent, PendingEventOrdering, EventStatus, EventTimeline } from 'matrix-js-sdk';
-import type { MatrixClient, Room, MatrixEvent, RoomMember } from 'matrix-js-sdk';
+import { createClient, ClientEvent, RoomEvent, RoomMemberEvent, PendingEventOrdering, EventStatus, EventTimeline, MatrixEvent } from 'matrix-js-sdk';
+import type { MatrixClient, Room, RoomMember } from 'matrix-js-sdk';
 
 let matrixClient: MatrixClient | null = null;
 
@@ -948,6 +948,35 @@ export function getRoomPowerLevels(room: Room): PowerLevels {
 	};
 }
 
+export function getPinnedEventIds(room: Room): string[] {
+	const state = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
+	const content = state?.getStateEvents('m.room.pinned_events', '')?.getContent();
+	return (content?.pinned as string[]) ?? [];
+}
+
+async function fetchPinnedEventIds(roomId: string): Promise<string[]> {
+	try {
+		const state = await matrixClient?.getStateEvent(roomId, 'm.room.pinned_events', '');
+		return (state?.pinned as string[]) ?? [];
+	} catch {
+		return [];
+	}
+}
+
+export async function pinMessage(room: Room, eventId: string): Promise<void> {
+	if (!matrixClient) throw new Error('Not logged in');
+	const current = await fetchPinnedEventIds(room.roomId);
+	const pinned = [...new Set([...current, eventId])];
+	await (matrixClient as any).sendStateEvent(room.roomId, 'm.room.pinned_events', { pinned }, '');
+}
+
+export async function unpinMessage(room: Room, eventId: string): Promise<void> {
+	if (!matrixClient) throw new Error('Not logged in');
+	const current = await fetchPinnedEventIds(room.roomId);
+	const pinned = current.filter((id) => id !== eventId);
+	await (matrixClient as any).sendStateEvent(room.roomId, 'm.room.pinned_events', { pinned }, '');
+}
+
 export async function setRoomPowerLevels(room: Room, updated: Partial<PowerLevels>): Promise<void> {
 	if (!matrixClient) throw new Error('Not logged in');
 	const state = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
@@ -1103,9 +1132,18 @@ export function onRedactionEvent(room: Room, callback: (event: MatrixEvent, room
 }
 
 export function findEventById(room: Room, eventId: string): MatrixEvent | null {
-	// Search the live timeline first, then any other timeline windows
 	const timelineSet = room.getUnfilteredTimelineSet();
 	return timelineSet.findEventById(eventId) ?? null;
+}
+
+export async function fetchEventById(roomId: string, eventId: string): Promise<MatrixEvent | null> {
+	if (!matrixClient) return null;
+	try {
+		const raw = await matrixClient.fetchRoomEvent(roomId, eventId);
+		return new MatrixEvent(raw);
+	} catch {
+		return null;
+	}
 }
 
 export async function sendReply(

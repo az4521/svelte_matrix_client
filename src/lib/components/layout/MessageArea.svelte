@@ -24,9 +24,11 @@
 	} from '$lib/matrix/client';
 	import { setActiveRoom } from '$lib/stores/rooms.svelte';
 	import { getMessages, setMessages, appendMessage, canLoadMore, setCanLoadMore, bumpReactionTick } from '$lib/stores/messages.svelte';
-	import { bumpUnreadTick } from '$lib/stores/rooms.svelte';
+	import { bumpUnreadTick, roomsState } from '$lib/stores/rooms.svelte';
 	import { mobileState } from '$lib/stores/mobile.svelte';
 	import RoomSettings from '$lib/components/layout/RoomSettings.svelte';
+	import PinnedMessagesPanel from '$lib/components/layout/PinnedMessagesPanel.svelte';
+	import { getPinnedEventIds, findEventById } from '$lib/matrix/client';
 	import { getMyPowerLevel, getRoomPowerLevels } from '$lib/matrix/client';
 
 	interface Props {
@@ -89,6 +91,13 @@
 	// untrack avoids the "captures initial value" warning - we intentionally want the initial prop value
 	let showMemberListLocal = $state(untrack(() => showMemberList));
 	let showRoomSettings = $state(false);
+	let showPinnedPanel = $state(false);
+	const pinnedCount = $derived.by(() => { void roomsState.roomsTick; return getPinnedEventIds(room).length; });
+
+	function scrollToMessage(eventId: string) {
+		const el = document.querySelector(`[data-event-id="${eventId}"]`);
+		el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+	}
 	let joiningUpgrade = $state(false);
 
 	const tombstone = $derived(getTombstone(room));
@@ -126,7 +135,7 @@
 
 	// Keep global rightOpen in sync so left drawer can avoid conflicting gestures
 	$effect(() => {
-		mobileState.rightOpen = isMobile && showMemberListLocal;
+		mobileState.rightOpen = isMobile && (showMemberListLocal || showPinnedPanel);
 	});
 
 	// Animated right drawer (mobile member list)
@@ -189,7 +198,7 @@
 	}
 
 	function memberDragStart(e: TouchEvent) {
-		if (!isMobile || isMemberDragging || memberDragPending || mobileState.leftOpen || mobileState.lightboxOpen || mobileState.settingsOpen) return;
+		if (!isMobile || isMemberDragging || memberDragPending || mobileState.leftOpen || mobileState.lightboxOpen || mobileState.settingsOpen || showPinnedPanel) return;
 		memberDragStartX = e.touches[0].clientX;
 		memberDragStartY = e.touches[0].clientY;
 		memberDragBase = showMemberListLocal ? 0 : MEMBER_WIDTH;
@@ -197,6 +206,70 @@
 		document.addEventListener('touchmove', memberDragMove, { passive: false });
 		document.addEventListener('touchend', memberDragEnd);
 		document.addEventListener('touchcancel', memberDragEnd);
+	}
+
+	// Animated right drawer (mobile pinned panel)
+	const PINNED_WIDTH = 280;
+	let pinnedTranslate = $state(PINNED_WIDTH);
+	let isPinnedDragging = $state(false);
+	let pinnedDragPending = false;
+	let pinnedDragStartX = 0;
+	let pinnedDragStartY = 0;
+	let pinnedDragBase = 0;
+
+	$effect(() => {
+		if (!isPinnedDragging) {
+			pinnedTranslate = showPinnedPanel ? 0 : PINNED_WIDTH;
+		}
+	});
+
+	const pinnedBackdropOpacity = $derived(
+		isMobile ? ((PINNED_WIDTH - pinnedTranslate) / PINNED_WIDTH) * 0.5 : 0
+	);
+
+	function pinnedDragMove(e: TouchEvent) {
+		if (!pinnedDragPending && !isPinnedDragging) return;
+		const touch = e.touches[0];
+		const dx = touch.clientX - pinnedDragStartX;
+		const dy = touch.clientY - pinnedDragStartY;
+		if (pinnedDragPending) {
+			if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+			if (Math.abs(dy) > Math.abs(dx) || dx <= 0) { pinnedDragPending = false; cleanupPinnedListeners(); return; }
+			pinnedDragPending = false;
+			isPinnedDragging = true;
+			(document.activeElement as HTMLElement)?.blur();
+		}
+		if (isPinnedDragging) {
+			e.preventDefault();
+			pinnedTranslate = Math.max(0, Math.min(PINNED_WIDTH, pinnedDragBase + dx));
+		}
+	}
+
+	function pinnedDragEnd() {
+		pinnedDragPending = false;
+		cleanupPinnedListeners();
+		if (!isPinnedDragging) return;
+		isPinnedDragging = false;
+		const progress = (PINNED_WIDTH - pinnedTranslate) / PINNED_WIDTH;
+		showPinnedPanel = progress > 0.75; // close if dragged more than 25% away
+		pinnedTranslate = showPinnedPanel ? 0 : PINNED_WIDTH;
+	}
+
+	function cleanupPinnedListeners() {
+		document.removeEventListener('touchmove', pinnedDragMove);
+		document.removeEventListener('touchend', pinnedDragEnd);
+		document.removeEventListener('touchcancel', pinnedDragEnd);
+	}
+
+	function pinnedDragStart(e: TouchEvent) {
+		if (!isMobile || !showPinnedPanel || isPinnedDragging || pinnedDragPending || mobileState.leftOpen || mobileState.lightboxOpen || showMemberListLocal) return;
+		pinnedDragStartX = e.touches[0].clientX;
+		pinnedDragStartY = e.touches[0].clientY;
+		pinnedDragBase = 0;
+		pinnedDragPending = true;
+		document.addEventListener('touchmove', pinnedDragMove, { passive: false });
+		document.addEventListener('touchend', pinnedDragEnd);
+		document.addEventListener('touchcancel', pinnedDragEnd);
 	}
 
 	const roomId = $derived(room.roomId);
@@ -385,7 +458,7 @@
 	ondragleave={onDragLeave}
 	ondragover={onDragOver}
 	ondrop={onDrop}
-	ontouchstart={memberDragStart}
+	ontouchstart={(e) => { memberDragStart(e); pinnedDragStart(e); }}
 >
 	<!-- Drop overlay -->
 	{#if isDragOver}
@@ -421,6 +494,15 @@
 				<div class="w-px h-5 bg-discord-divider"></div>
 				<p class="text-sm text-discord-textMuted truncate flex-1">{topic}</p>
 			{/if}
+			{#if !topic}<div class="flex-1"></div>{/if}
+			<!-- Pinned messages button -->
+			<button
+				onclick={() => showPinnedPanel = !showPinnedPanel}
+				class="p-1.5 rounded transition-colors {showPinnedPanel ? 'text-discord-accent bg-discord-messageHover' : 'text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover'}"
+				title="Pinned messages{pinnedCount > 0 ? ` (${pinnedCount})` : ''}"
+			>
+				<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
+			</button>
 			<!-- Settings button (admins/mods only) -->
 			{#if canAccessSettings}
 				<button
@@ -436,7 +518,7 @@
 			<!-- Toggle member list -->
 			<button
 				onclick={() => showMemberListLocal = !showMemberListLocal}
-				class="{canAccessSettings ? '' : 'ml-auto'} p-1.5 rounded text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors"
+				class="p-1.5 rounded text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors"
 				title="Toggle member list"
 			>
 				<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -537,6 +619,24 @@
 
 	<!-- Debug panel (Ctrl+Shift+D to toggle) -->
 	<DebugPanel {room} />
+
+	<!-- Pinned messages panel (animated overlay on mobile, inline on desktop) -->
+	{#if isMobile}
+		<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+		<div
+			class="absolute inset-0 z-30"
+			style="background: rgba(0,0,0,{pinnedBackdropOpacity}); pointer-events: {pinnedBackdropOpacity > 0.01 ? 'auto' : 'none'};"
+			onclick={() => { if (!isPinnedDragging) showPinnedPanel = false; }}
+		></div>
+		<div
+			class="absolute inset-y-0 right-0 z-40 h-full"
+			style="width: {PINNED_WIDTH}px; transform: translateX({pinnedTranslate}px); {isPinnedDragging ? '' : 'transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);'} {pinnedTranslate >= PINNED_WIDTH ? '' : 'box-shadow: -25px 0 50px -12px rgba(0,0,0,0.5);'}"
+		>
+			<PinnedMessagesPanel {room} onClose={() => showPinnedPanel = false} onJumpTo={scrollToMessage} />
+		</div>
+	{:else if showPinnedPanel}
+		<PinnedMessagesPanel {room} onClose={() => showPinnedPanel = false} onJumpTo={scrollToMessage} />
+	{/if}
 
 	<!-- Member list sidebar (animated overlay on mobile, inline on desktop) -->
 	{#if isMobile}
