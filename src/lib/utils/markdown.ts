@@ -21,7 +21,7 @@ function escapeHtml(s: string): string {
 }
 
 function processInline(raw: string): { html: string; changed: boolean } {
-	// Pull code spans and URLs out first so their content is never processed
+	// Pull code spans, URLs, and emoji shortcodes out first so their content is never processed
 	const spans: string[] = [];
 	let s = raw.replace(/`([^`\n]+)`/g, (_, code) => {
 		spans.push(`<code>${escapeHtml(code)}</code>`);
@@ -29,6 +29,11 @@ function processInline(raw: string): { html: string; changed: boolean } {
 	});
 	s = s.replace(/https?:\/\/[^\s<>)"']*/g, (url) => {
 		spans.push(`<a href="${escapeHtml(url)}">${escapeHtml(url)}</a>`);
+		return `\x02${spans.length - 1}\x03`;
+	});
+	// Stash :emoji_shortcodes: so underscores/asterisks in names aren't formatted
+	s = s.replace(/:[a-zA-Z0-9_+-]+:/g, (token) => {
+		spans.push(escapeHtml(token));
 		return `\x02${spans.length - 1}\x03`;
 	});
 	const hadSpans = spans.length > 0;
