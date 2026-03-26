@@ -6,6 +6,16 @@ html, body {
   overscroll-behavior-x: none;
 }
 
+@keyframes message-highlight-fade {
+  0%   { background-color: rgba(114, 137, 218, 0.35); }
+  70%  { background-color: rgba(114, 137, 218, 0.35); }
+  100% { background-color: transparent; }
+}
+
+.message-highlight {
+  animation: message-highlight-fade 2s ease-out forwards;
+}
+
 :root {
   /* ── Brand (blurple) scale ───────────────────────── */
   --brand-100: #f8f9fd;

@@ -2,6 +2,7 @@
 	import type { Room, MatrixEvent } from 'matrix-js-sdk';
 	import { getPinnedEventIds, unpinMessage, findEventById, fetchEventById, getMemberName, getMemberAvatar, mxcToHttp, getMyPowerLevel, getRoomPowerLevels } from '$lib/matrix/client';
 	import { roomsState } from '$lib/stores/rooms.svelte';
+	import { mobileState } from '$lib/stores/mobile.svelte';
 	import Avatar from '$lib/components/ui/Avatar.svelte';
 	import { format } from 'date-fns';
 
@@ -46,13 +47,9 @@
 	}
 </script>
 
-<div class="w-full h-full flex flex-col bg-discord-backgroundSecondary border-l border-discord-divider">
-	<div class="flex items-center gap-2 px-4 py-3 border-b border-discord-divider flex-shrink-0">
+<div class="{mobileState.isMobile ? '' : 'w-72'} h-full flex flex-col bg-discord-backgroundSecondary border-l border-discord-divider">
+	<div class="h-12 flex items-center gap-2 px-4 py-3 border-b border-discord-divider flex-shrink-0">
 		<h3 class="font-semibold text-discord-textPrimary text-sm flex-1">Pinned Messages</h3>
-		<!-- svelte-ignore a11y_consider_explicit_label -->
-		<button onclick={onClose} class="p-1 rounded text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors">
-			<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-		</button>
 	</div>
 
 	<div class="flex-1 overflow-y-auto">

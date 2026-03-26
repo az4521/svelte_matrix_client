@@ -96,7 +96,12 @@
 
 	function scrollToMessage(eventId: string) {
 		const el = document.querySelector(`[data-event-id="${eventId}"]`);
-		el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+		if (!el) return;
+		el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+		el.classList.remove('message-highlight');
+		// Force reflow so re-triggering the animation works if called twice
+		void (el as HTMLElement).offsetWidth;
+		el.classList.add('message-highlight');
 	}
 	let joiningUpgrade = $state(false);
 
