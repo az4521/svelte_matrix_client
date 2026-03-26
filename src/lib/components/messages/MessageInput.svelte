@@ -497,7 +497,7 @@
 	</div>
 	<div class="relative mt-1 px-1 h-4">
 		{#if typingUsers.length > 0}
-			<p class="absolute inset-0 text-xs text-discord-textMuted bg-discord-backgroundPrimary/90">{typingText()}</p>
+			<p class="absolute inset-0 text-xs text-discord-textMuted bg-discord-background/90">{typingText()}</p>
 		{:else if !mobileState.isMobile}
 			<p class="text-xs text-discord-textMuted">
 				<kbd class="font-mono">Enter</kbd> to send &middot;

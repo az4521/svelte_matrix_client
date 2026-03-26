@@ -4,6 +4,7 @@
 	import { getRoomAvatar, getRoomDisplayName, getUnreadCount, joinRoom, leaveRoom, acceptInvite, rejectInvite, getInviteSender, getMyPowerLevel, getRoomPowerLevels, getRoom } from '$lib/matrix/client';
 	import { roomsState, setActiveRoom, setActiveSpace } from '$lib/stores/rooms.svelte';
 	import { auth } from '$lib/stores/auth.svelte';
+	import QuickActions from '$lib/components/layout/QuickActions.svelte';
 
 	interface Props {
 		onLogout: () => void;
@@ -173,6 +174,11 @@
 		{/if}
 	</div>
 
+	<!-- Quick actions (Home view only) -->
+	{#if !roomsState.activeSpaceId}
+		<QuickActions />
+	{/if}
+
 	<!-- Room list -->
 	<div class="flex-1 overflow-y-auto py-2">
 
@@ -202,7 +208,7 @@
 							<button
 								onclick={() => handleReject(room.roomId)}
 								disabled={busy}
-								class="flex-1 py-1 rounded text-xs font-semibold bg-discord-backgroundPrimary hover:bg-discord-danger text-discord-textMuted hover:text-white transition-colors disabled:opacity-50"
+								class="flex-1 py-1 rounded text-xs font-semibold bg-discord-background hover:bg-discord-danger text-discord-textMuted hover:text-white transition-colors disabled:opacity-50"
 							>Reject</button>
 						</div>
 					</div>

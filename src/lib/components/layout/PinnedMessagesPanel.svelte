@@ -49,7 +49,7 @@
 
 <div class="{mobileState.isMobile ? '' : 'w-72'} h-full flex flex-col bg-discord-backgroundSecondary border-l border-discord-divider">
 	<div class="h-12 flex items-center gap-2 px-4 py-3 border-b border-discord-divider flex-shrink-0">
-		<h3 class="font-semibold text-discord-textPrimary text-sm flex-1">Pinned Messages</h3>
+		<h3 class="text-xs font-semibold text-discord-textMuted uppercase tracking-wide flex-1">Pinned Messages</h3>
 	</div>
 
 	<div class="flex-1 overflow-y-auto">

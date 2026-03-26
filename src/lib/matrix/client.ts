@@ -746,6 +746,45 @@ export async function joinRoom(roomId: string, via?: string[]): Promise<void> {
 	await matrixClient.joinRoom(roomId, via?.length ? { viaServers: via } : undefined);
 }
 
+export async function joinRoomByAlias(alias: string): Promise<string> {
+	if (!matrixClient) throw new Error('Not logged in');
+	const result = await matrixClient.joinRoom(alias);
+	return result.roomId;
+}
+
+export async function createRoom(name: string, topic: string): Promise<string> {
+	if (!matrixClient) throw new Error('Not logged in');
+	const result = await matrixClient.createRoom({
+		name: name || undefined,
+		topic: topic || undefined,
+		visibility: 'private' as any,
+		preset: 'private_chat' as any,
+	});
+	return result.room_id;
+}
+
+export async function createDirectMessage(userId: string): Promise<string> {
+	if (!matrixClient) throw new Error('Not logged in');
+	// Reuse existing DM room if one exists
+	const existing = matrixClient.getAccountData('m.direct')?.getContent() as Record<string, string[]> | undefined;
+	if (existing?.[userId]?.length) {
+		const existingRoomId = existing[userId][0];
+		if (matrixClient.getRoom(existingRoomId)?.getMyMembership() === 'join') return existingRoomId;
+	}
+	const result = await matrixClient.createRoom({
+		invite: [userId],
+		is_direct: true,
+		preset: 'trusted_private_chat' as any,
+		visibility: 'private' as any,
+	});
+	const roomId = result.room_id;
+	// Update m.direct account data so the room shows in DMs
+	const dmData: Record<string, string[]> = { ...(existing ?? {}) };
+	dmData[userId] = [...(dmData[userId] ?? []), roomId];
+	await matrixClient.setAccountData('m.direct', dmData);
+	return roomId;
+}
+
 export function getInvitedRooms(): Room[] {
 	if (!matrixClient) return [];
 	return matrixClient.getRooms().filter((r) => r.getMyMembership() === 'invite');

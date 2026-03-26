@@ -110,7 +110,7 @@
 	}
 </script>
 
-<div class="w-80 flex-shrink-0 flex flex-col border-l border-discord-divider bg-discord-backgroundPrimary overflow-hidden">
+<div class="w-80 flex-shrink-0 flex flex-col border-l border-discord-divider bg-discord-background overflow-hidden">
 	<!-- Header -->
 	<div class="h-12 px-4 flex items-center justify-between border-b border-discord-divider flex-shrink-0">
 		<span class="font-semibold text-discord-textPrimary text-sm">Thread</span>
