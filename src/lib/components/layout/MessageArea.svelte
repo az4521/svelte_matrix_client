@@ -33,12 +33,11 @@
 
 	interface Props {
 		room: Room;
-		showMemberList: boolean;
 		isMobile?: boolean;
 		onMenuOpen?: () => void;
 	}
 
-	let { room, showMemberList = true, isMobile = false, onMenuOpen }: Props = $props();
+	let { room, isMobile = false, onMenuOpen }: Props = $props();
 
 	let scrollEl: HTMLDivElement | undefined = $state();
 	let messageInputEl: ReturnType<typeof MessageInput> | undefined = $state();
@@ -89,7 +88,7 @@
 		editRequestedEventId = null;
 	}
 	// untrack avoids the "captures initial value" warning - we intentionally want the initial prop value
-	let showMemberListLocal = $state(untrack(() => showMemberList));
+	let showMemberList = $state(false);
 	let showRoomSettings = $state(false);
 	let showPinnedPanel = $state(false);
 	const pinnedCount = $derived.by(() => { void roomsState.roomsTick; return getPinnedEventIds(room).length; });
@@ -135,16 +134,16 @@
 
 	// Hide member list when switching to mobile (isMobile is set async in onMount)
 	$effect(() => {
-		if (isMobile) showMemberListLocal = false;
+		if (isMobile) showMemberList = false;
 	});
 
 	// Keep global rightOpen in sync so left drawer can avoid conflicting gestures
 	$effect(() => {
-		mobileState.rightOpen = isMobile && (showMemberListLocal || showPinnedPanel);
+		mobileState.rightOpen = isMobile && (showMemberList || showPinnedPanel);
 	});
 
 	// Animated right drawer (mobile member list)
-	const MEMBER_WIDTH = 240; // w-60
+	const MEMBER_WIDTH = 280; 
 	let memberTranslate = $state(MEMBER_WIDTH);
 	let isMemberDragging = $state(false);
 	let memberDragPending = false;
@@ -154,7 +153,7 @@
 
 	$effect(() => {
 		if (!isMemberDragging) {
-			memberTranslate = showMemberListLocal ? 0 : MEMBER_WIDTH;
+			memberTranslate = showMemberList ? 0 : MEMBER_WIDTH;
 		}
 	});
 
@@ -171,8 +170,8 @@
 		if (memberDragPending) {
 			if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
 			if (Math.abs(dy) > Math.abs(dx)) { memberDragPending = false; cleanupMemberListeners(); return; }
-			const openingGesture = dx < 0 && !showMemberListLocal;
-			const closingGesture = dx > 0 && showMemberListLocal;
+			const openingGesture = dx < 0 && !showMemberList;
+			const closingGesture = dx > 0 && showMemberList;
 			if (!openingGesture && !closingGesture) { memberDragPending = false; cleanupMemberListeners(); return; }
 			memberDragPending = false;
 			isMemberDragging = true;
@@ -192,8 +191,8 @@
 		isMemberDragging = false;
 		const progress = (MEMBER_WIDTH - memberTranslate) / MEMBER_WIDTH;
 		const startedOpen = memberDragBase === 0;
-		showMemberListLocal = startedOpen ? progress >= 0.75 : progress > 0.25;
-		memberTranslate = showMemberListLocal ? 0 : MEMBER_WIDTH;
+		showMemberList = startedOpen ? progress >= 0.75 : progress > 0.25;
+		memberTranslate = showMemberList ? 0 : MEMBER_WIDTH;
 	}
 
 	function cleanupMemberListeners() {
@@ -206,7 +205,7 @@
 		if (!isMobile || isMemberDragging || memberDragPending || mobileState.leftOpen || mobileState.lightboxOpen || mobileState.settingsOpen || showPinnedPanel) return;
 		memberDragStartX = e.touches[0].clientX;
 		memberDragStartY = e.touches[0].clientY;
-		memberDragBase = showMemberListLocal ? 0 : MEMBER_WIDTH;
+		memberDragBase = showMemberList ? 0 : MEMBER_WIDTH;
 		memberDragPending = true;
 		document.addEventListener('touchmove', memberDragMove, { passive: false });
 		document.addEventListener('touchend', memberDragEnd);
@@ -267,7 +266,7 @@
 	}
 
 	function pinnedDragStart(e: TouchEvent) {
-		if (!isMobile || !showPinnedPanel || isPinnedDragging || pinnedDragPending || mobileState.leftOpen || mobileState.lightboxOpen || showMemberListLocal) return;
+		if (!isMobile || !showPinnedPanel || isPinnedDragging || pinnedDragPending || mobileState.leftOpen || mobileState.lightboxOpen || showMemberList) return;
 		pinnedDragStartX = e.touches[0].clientX;
 		pinnedDragStartY = e.touches[0].clientY;
 		pinnedDragBase = 0;
@@ -500,14 +499,6 @@
 				<p class="text-sm text-discord-textMuted truncate flex-1">{topic}</p>
 			{/if}
 			{#if !topic}<div class="flex-1"></div>{/if}
-			<!-- Pinned messages button -->
-			<button
-				onclick={() => showPinnedPanel = !showPinnedPanel}
-				class="p-1.5 rounded transition-colors {showPinnedPanel ? 'text-discord-accent bg-discord-messageHover' : 'text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover'}"
-				title="Pinned messages{pinnedCount > 0 ? ` (${pinnedCount})` : ''}"
-			>
-				<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
-			</button>
 			<!-- Settings button (admins/mods only) -->
 			{#if canAccessSettings}
 				<button
@@ -520,10 +511,27 @@
 					</svg>
 				</button>
 			{/if}
+			<!-- Pinned messages button -->
+			<button
+				onclick={() => {
+					showPinnedPanel = !showPinnedPanel
+					if (showPinnedPanel) {
+						showMemberList = false
+					}
+				}}				class="p-1.5 rounded transition-colors {showPinnedPanel ? 'text-discord-accent bg-discord-messageHover' : 'text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover'}"
+				title="Pinned messages{pinnedCount > 0 ? ` (${pinnedCount})` : ''}"
+			>
+				<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
+			</button>
 			<!-- Toggle member list -->
 			<button
-				onclick={() => showMemberListLocal = !showMemberListLocal}
-				class="p-1.5 rounded text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors"
+				onclick={() => {
+					showMemberList = !showMemberList
+					if (showMemberList) {
+						showPinnedPanel = false
+					}
+				}}
+				class="p-1.5 rounded transition-colors {showMemberList ? 'text-discord-accent bg-discord-messageHover' : 'text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover'}"
 				title="Toggle member list"
 			>
 				<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -597,10 +605,10 @@
 
 		<!-- Scroll to bottom button -->
 		{#if !isAtBottom && messages.length > 0}
-			<div class="absolute bottom-20 {showMemberListLocal && !isMobile ? 'right-72' : 'right-4'} z-10">
+			<div class="absolute bottom-24 left-0 right-0 flex justify-center z-10 pointer-events-none">
 				<button
 					onclick={() => scrollToBottom(false)}
-					class="bg-discord-backgroundSecondary hover:bg-discord-messageHover text-discord-textPrimary px-3 py-1.5 rounded-full shadow-lg text-sm font-medium border border-discord-divider transition-colors flex items-center gap-1.5"
+					class="pointer-events-auto bg-discord-backgroundSecondary hover:bg-discord-messageHover text-discord-textPrimary px-3 py-1.5 rounded-full shadow-lg text-sm font-medium border border-discord-divider transition-colors flex items-center gap-1.5"
 				>
 					<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
 						<path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
@@ -650,15 +658,15 @@
 		<div
 			class="absolute inset-0 z-30"
 			style="background: rgba(0,0,0,{memberBackdropOpacity}); pointer-events: {memberBackdropOpacity > 0.01 ? 'auto' : 'none'};"
-			onclick={() => { if (!isMemberDragging) showMemberListLocal = false; }}
+			onclick={() => { if (!isMemberDragging) showMemberList = false; }}
 		></div>
 		<div
-			class="absolute inset-y-0 right-0 z-40 w-60 h-full"
-			style="transform: translateX({memberTranslate}px); {isMemberDragging ? '' : 'transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);'} {memberTranslate >= MEMBER_WIDTH ? '' : 'box-shadow: -25px 0 50px -12px rgba(0,0,0,0.5);'}"
+			class="absolute inset-y-0 right-0 z-40 h-full"
+			style="width: {MEMBER_WIDTH}px; transform: translateX({memberTranslate}px); {isMemberDragging ? '' : 'transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);'} {memberTranslate >= MEMBER_WIDTH ? '' : 'box-shadow: -25px 0 50px -12px rgba(0,0,0,0.5);'}"
 		>
 			<MemberList {room} />
 		</div>
-	{:else if showMemberListLocal}
+	{:else if showMemberList}
 		<MemberList {room} />
 	{/if}
 </div>

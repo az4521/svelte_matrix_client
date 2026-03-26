@@ -2,6 +2,7 @@
 	import type { Room, RoomMember } from 'matrix-js-sdk';
 	import Avatar from '$lib/components/ui/Avatar.svelte';
 	import { getRoomMembers, mxcToHttp } from '$lib/matrix/client';
+	import { mobileState } from '$lib/stores/mobile.svelte';
 
 	interface Props {
 		room: Room;
@@ -29,7 +30,7 @@
 	}
 </script>
 
-<div class="w-60 h-full bg-discord-backgroundSecondary flex flex-col flex-shrink-0 overflow-hidden">
+<div class="{mobileState.isMobile ? '' : 'w-72'} h-full bg-discord-backgroundSecondary flex flex-col flex-shrink-0 overflow-hidden">
 	<div class="h-12 px-4 flex items-center border-b border-discord-divider flex-shrink-0">
 		<h3 class="text-xs font-semibold text-discord-textMuted uppercase tracking-wide">
 			Members — {members.length}

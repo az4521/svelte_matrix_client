@@ -274,7 +274,6 @@
 			{#if activeRoom}
 				<MessageArea
 					room={activeRoom}
-					showMemberList={!mobileState.isMobile}
 					isMobile={mobileState.isMobile}
 					onMenuOpen={() => (mobileState.leftOpen = true)}
 				/>
