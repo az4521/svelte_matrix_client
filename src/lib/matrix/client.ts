@@ -665,6 +665,19 @@ export async function leaveRoom(roomId: string): Promise<void> {
 	setTimeout(() => { pendingLeaves.delete(roomId); clearInterval(check); }, 30000);
 }
 
+export interface RoomTombstone {
+	body: string;
+	replacementRoomId: string;
+}
+
+export function getTombstone(room: Room): RoomTombstone | null {
+	const event = room.getLiveTimeline().getState(EventTimeline.FORWARDS)?.getStateEvents('m.room.tombstone', '');
+	if (!event) return null;
+	const content = event.getContent();
+	if (!content?.replacement_room) return null;
+	return { body: content.body ?? 'This room has been replaced.', replacementRoomId: content.replacement_room };
+}
+
 export async function joinRoom(roomId: string, via?: string[]): Promise<void> {
 	if (!matrixClient) throw new Error('Not logged in');
 	await matrixClient.joinRoom(roomId, via?.length ? { viaServers: via } : undefined);
