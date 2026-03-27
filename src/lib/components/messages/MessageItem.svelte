@@ -317,7 +317,14 @@
 	}
 
 	function formatTime(ts: number): string {
-		return format(new Date(ts), 'h:mm a');
+		const d = new Date(ts);
+		const today = new Date();
+		const yesterday = new Date(today);
+		yesterday.setDate(yesterday.getDate() - 1);
+
+		if (d.toDateString() === today.toDateString()) return format(d, 'h:mm a');
+		if (d.toDateString() === yesterday.toDateString()) return 'Yesterday at ' + format(d, 'h:mm a');
+		return format(d, 'yyyy/MM/dd h:mm a')
 	}
 
 	$effect(() => {
