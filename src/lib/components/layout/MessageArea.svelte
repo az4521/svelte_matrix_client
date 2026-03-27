@@ -59,6 +59,7 @@
 	let replyToEvent = $state<MatrixEvent | null>(null);
 	let editRequestedEventId = $state<string | null>(null);
 	let isDragOver = $state(false);
+	let intervalId: number | undefined = $state();
 	let dragCounter = 0; // track enter/leave pairs to avoid flicker on child elements
 
 	function onDragEnter(e: DragEvent) {
@@ -132,18 +133,11 @@
 			if (!el) return;
 		}
 		const target = el as HTMLElement;
-		target.scrollIntoView({ behavior: "instant", block: "center" });
-		// Re-center after media/previews load in and shift layout
-		setTimeout(() => target.scrollIntoView({ behavior: "instant", block: "center" }), 150);
-		setTimeout(() => target.scrollIntoView({ behavior: "instant", block: "center" }), 600);
-		// Start highlight once layout has settled
-		setTimeout(() => {
-			target.scrollIntoView({ behavior: "instant", block: "center" });
-			target.classList.remove("message-highlight");
-			void target.offsetWidth;
-			target.classList.add("message-highlight");
-			setTimeout(() => target.classList.remove("message-highlight"), 2000);
-		}, 800);
+		intervalId = setInterval(() => target.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+		target.classList.remove("message-highlight");
+		void target.offsetWidth;
+		target.classList.add("message-highlight");
+		setTimeout(() => {target.classList.remove("message-highlight"); clearInterval(intervalId)}, 2000);
 	}
 	let joiningUpgrade = $state(false);
 
@@ -853,7 +847,7 @@
 		</div>
 
 		<!-- Scroll to bottom button -->
-		{#if !isAtBottom && reversedMessages.length > 0}
+		{#if !isAtBottom && !isContextView && reversedMessages.length > 0}
 			<div
 				class="absolute bottom-24 left-0 right-0 flex justify-center z-10 pointer-events-none"
 			>
