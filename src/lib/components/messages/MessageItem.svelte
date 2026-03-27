@@ -18,6 +18,8 @@
 	import { isFavouriteGif, addFavouriteGif, removeFavouriteGif, favouritesState } from '$lib/stores/favourites.svelte';
 	import { mobileState } from '$lib/stores/mobile.svelte';
 
+	import type { ReadReceiptInfo } from '$lib/matrix/client';
+
 	interface Props {
 		event: MatrixEvent;
 		room: Room;
@@ -25,9 +27,10 @@
 		onReply: (event: MatrixEvent) => void;
 		editRequested?: boolean;
 		onEditDone?: () => void;
+		receipts?: ReadReceiptInfo[];
 	}
 
-	let { event, room, showHeader, onReply, editRequested = false, onEditDone }: Props = $props();
+	let { event, room, showHeader, onReply, editRequested = false, onEditDone, receipts = [] }: Props = $props();
 
 	const canPin = $derived.by(() => {
 		const myPl = getMyPowerLevel(room);
@@ -686,6 +689,29 @@
 
 		<!-- Reactions -->
 		<Reactions {eventId} {room} {reactionTick} />
+
+		<!-- Read receipts -->
+		{#if receipts.length > 0}
+			<div class="flex items-center gap-0.5 px-4 pb-0.5 justify-end">
+				{#each receipts.slice(0, 5) as r (r.userId)}
+					{#if r.avatarUrl}
+						<img
+							src={r.avatarUrl}
+							alt={r.name}
+							title={r.name}
+							class="w-4 h-4 rounded-full object-cover flex-shrink-0"
+						/>
+					{:else}
+						<div class="w-4 h-4 rounded-full bg-discord-backgroundTertiary flex items-center justify-center flex-shrink-0" title={r.name}>
+							<span class="text-[8px] text-discord-textMuted font-semibold leading-none">{r.name[0]?.toUpperCase()}</span>
+						</div>
+					{/if}
+				{/each}
+				{#if receipts.length > 5}
+					<span class="text-[10px] text-discord-textMuted ml-1">+{receipts.length - 5}</span>
+				{/if}
+			</div>
+		{/if}
 
 		<!-- Inline timestamp (non-grouped messages, shows on hover) -->
 		{#if !showHeader}

@@ -12,17 +12,15 @@ Messaging
 - Voice messages (m.audio recording)
 - Notifications
 - Push notifications (via a push gateway/service worker)
-- Creating direct messages
 - Message forwarding
 - Polls (m.poll / MSC3381)
 
 Rooms
 
-- Creating rooms and spaces
+- Creating rooms within spaces and spaces
 - Initiating room upgrades
 - Room directory / public room search
 - Knock to join (requesting access to invite-only rooms)
-- Join via link (for joining public rooms)
 - Per-room notification settings (all messages, mentions only, muted)
 - Notification badge on browser tab (favicon)
 - Moderation (kick/ban/deleting messages)

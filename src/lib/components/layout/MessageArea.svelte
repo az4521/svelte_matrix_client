@@ -20,7 +20,9 @@
 		sendReadReceipt,
 		getTombstone,
 		joinRoom,
-		getRoom
+		getRoom,
+		getReadUpToEventId,
+		getReceiptsForEvent,
 	} from '$lib/matrix/client';
 	import { setActiveRoom } from '$lib/stores/rooms.svelte';
 	import { getMessages, setMessages, appendMessage, canLoadMore, setCanLoadMore, bumpReactionTick } from '$lib/stores/messages.svelte';
@@ -40,6 +42,7 @@
 	let { room, isMobile = false, onMenuOpen }: Props = $props();
 
 	let scrollEl: HTMLDivElement | undefined = $state();
+	let bottomAnchorEl: HTMLDivElement | undefined = $state();	
 	let messageInputEl: ReturnType<typeof MessageInput> | undefined = $state();
 	let isAtBottom = $state(true);
 	let loadingOlder = $state(false);
@@ -280,6 +283,10 @@
 	const roomName = $derived(getRoomDisplayName(room));
 	const topic = $derived(getRoomTopic(room));
 	const messages = $derived(getMessages(roomId));
+	const reversedMessages = $derived(messages.toReversed());
+
+	// The event ID the user has read up to — used to show "New messages" divider on load
+	let unreadMarkerEventId = $state<string | null>(null);
 
 	// Clear reply when switching rooms
 	$effect(() => {
@@ -290,12 +297,32 @@
 	// Load messages when room changes — always reload from SDK state (fast, in-memory)
 	$effect(() => {
 		const id = room.roomId; // track room changes
+		let readUpTo: string | null = null;
 		untrack(() => {
 			const events = getTimelineMessages(room);
 			setMessages(id, events);
+			// Determine if there are unread messages by checking read marker vs last event
+			const marker = getReadUpToEventId(room);
+			const lastEventId = events[events.length - 1]?.getId();
+			if (marker && marker !== lastEventId) {
+				readUpTo = marker;
+			}
 		});
-		// Scroll to bottom on room change, then fill viewport if needed
-		tick().then(() => { scrollToBottom(true); autoFillMessages(); });
+		unreadMarkerEventId = readUpTo;
+		tick().then(() => {
+			if (readUpTo) {
+				// Scroll so the first unread message is visible near the top
+				const markerEl = document.querySelector(`[data-event-id="${readUpTo}"]`);
+				if (markerEl && scrollEl) {
+					markerEl.scrollIntoView({ block: 'end' });
+				} else {
+					scrollToBottom(true);
+				}
+			} else {
+				scrollToBottom(true);
+			}
+			autoFillMessages();
+		});
 	});
 
 	// Reload messages once the initial sync completes (catches messages missed during SYNCING state)
@@ -368,15 +395,22 @@
 		if (last) {
 			sendReadReceipt(last).catch(() => {});
 			bumpUnreadTick();
+			unreadMarkerEventId = null;
 		}
 	}
 
 	function scrollToBottom(instant: boolean) {
+		console.log('SCROLLTOBOTTOM')
 		if (!scrollEl) return;
-		scrollEl.scrollTo({
+		if (!bottomAnchorEl) return;
+		bottomAnchorEl.scrollIntoView({
+			behavior: instant ? 'instant' : 'smooth',
+			block: 'end'
+		});
+		/*scrollEl.scrollTo({
 			top: scrollEl.scrollHeight,
 			behavior: instant ? 'instant' : 'smooth'
-		});
+		});*/
 		markAsRead();
 	}
 
@@ -384,12 +418,12 @@
 		if (!scrollEl) return;
 		const { scrollTop, scrollHeight, clientHeight } = scrollEl;
 		const wasAtBottom = isAtBottom;
-		isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+		isAtBottom = scrollTop > -100;
 
 		if (!wasAtBottom && isAtBottom) markAsRead();
 
-		// Load more when near the top
-		if (scrollTop < 200 && !loadingOlder) {
+		// Load older messages when near the visual top (scrollTop near 0)
+		if (scrollTop < (-(scrollHeight - clientHeight) + 100) && !loadingOlder) {
 			loadOlderMessages();
 		}
 	}
@@ -397,6 +431,7 @@
 	async function loadOlderMessages() {
 		if (loadingOlder || !canLoadMore(roomId)) return;
 		loadingOlder = true;
+		const prevScrollTop = scrollEl?.scrollTop ?? 0;
 		const prevScrollHeight = scrollEl?.scrollHeight ?? 0;
 
 		try {
@@ -405,10 +440,11 @@
 			const events = getTimelineMessages(room);
 			setMessages(roomId, events);
 
-			// Restore scroll position after prepending
+			// flex-col-reverse: older content appended at DOM end = high scrollTop end
+			// Keep current view stable by adding the new height delta to scrollTop
 			await tick();
 			if (scrollEl) {
-				scrollEl.scrollTop = scrollEl.scrollHeight - prevScrollHeight;
+				scrollEl.scrollTop = prevScrollTop + (scrollEl.scrollHeight - prevScrollHeight);
 			}
 		} finally {
 			loadingOlder = false;
@@ -435,13 +471,13 @@
 	}
 
 	// Group messages by date for date separators
-	function getDateLabel(ts: number): string {
+	function getDateLabel(ts: number): string | null {
 		const d = new Date(ts);
 		const today = new Date();
 		const yesterday = new Date(today);
 		yesterday.setDate(yesterday.getDate() - 1);
 
-		if (d.toDateString() === today.toDateString()) return 'Today';
+		if (d.toDateString() === today.toDateString()) return null;
 		if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
 		return d.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 	}
@@ -544,45 +580,9 @@
 		<div
 			bind:this={scrollEl}
 			onscroll={onScroll}
-			class="flex-1 overflow-y-auto overflow-x-hidden py-4"
+			class="overflow-y-auto overflow-x-hidden py-4 flex flex-1 flex-col-reverse *:[overflow-anchor:none]"
 		>
-			<!-- Load more indicator -->
-			{#if loadingOlder}
-				<div class="flex justify-center py-4">
-					<div class="w-6 h-6 border-2 border-discord-accent border-t-transparent rounded-full animate-spin"></div>
-				</div>
-			{/if}
-
-			<!-- Welcome message at the top -->
-			{#if messages.length === 0}
-				<div class="px-4 pb-4">
-					<div class="w-16 h-16 rounded-full bg-discord-accent flex items-center justify-center mb-4">
-						<span class="text-3xl font-bold text-white">#</span>
-					</div>
-					<h3 class="text-2xl font-bold text-discord-textPrimary mb-1">Welcome to #{roomName}!</h3>
-					<p class="text-discord-textMuted">This is the beginning of the #{roomName} room.</p>
-				</div>
-			{/if}
-
-			<!-- Message list -->
-			{#each messages as event, i (event.getId())}
-				{@const dateLabel = showDateSeparator(messages, i)}
-				{#if dateLabel}
-					<div class="flex items-center gap-4 px-4 my-4">
-						<div class="flex-1 h-px bg-discord-divider"></div>
-						<span class="text-xs font-semibold text-discord-textMuted">{dateLabel}</span>
-						<div class="flex-1 h-px bg-discord-divider"></div>
-					</div>
-				{/if}
-				<MessageItem
-					{event}
-					{room}
-					showHeader={shouldShowHeader(messages, i)}
-					onReply={(e) => { replyToEvent = e; }}
-					editRequested={editRequestedEventId === event.getId()}
-					onEditDone={() => messageInputEl?.focus()}
-				/>
-			{/each}
+			<div bind:this={bottomAnchorEl} class="{unreadMarkerEventId!=null?'![overflow-anchor:auto]':''} h-px"></div>
 
 			<!-- Room upgrade tombstone banner -->
 			{#if tombstone}
@@ -601,10 +601,57 @@
 					</button>
 				</div>
 			{/if}
+
+			<!-- Message list -->
+			{#each reversedMessages as event, i (event.getId())}
+				{@const dateLabel = showDateSeparator(reversedMessages, i)}
+				{@const receipts = getReceiptsForEvent(room, event)}
+				{#if dateLabel}
+					<div class="flex items-center gap-4 px-4 my-4">
+						<div class="flex-1 h-px bg-discord-divider"></div>
+						<span class="text-xs font-semibold text-discord-textMuted">{dateLabel}</span>
+						<div class="flex-1 h-px bg-discord-divider"></div>
+					</div>
+				{/if}
+				{#if unreadMarkerEventId && reversedMessages[i - 1]?.getId() === unreadMarkerEventId}
+					<div class="flex items-center gap-3 px-4 my-2 ![overflow-anchor:auto]">
+						<div class="flex-1 h-px bg-red-500/60"></div>
+						<span class="text-xs font-semibold text-red-400 uppercase tracking-wide">New Messages</span>
+						<div class="flex-1 h-px bg-red-500/60"></div>
+					</div>
+				{/if}
+				<MessageItem
+					{event}
+					{room}
+					showHeader={shouldShowHeader(reversedMessages, i)}
+					onReply={(e) => { replyToEvent = e; }}
+					editRequested={editRequestedEventId === event.getId()}
+					onEditDone={() => messageInputEl?.focus()}
+					{receipts}
+				/>
+			{/each}
+
+			<!-- Welcome message at the top -->
+			{#if reversedMessages.length === 0}
+				<div class="px-4 pb-4">
+					<div class="w-16 h-16 rounded-full bg-discord-accent flex items-center justify-center mb-4">
+						<span class="text-3xl font-bold text-white">#</span>
+					</div>
+					<h3 class="text-2xl font-bold text-discord-textPrimary mb-1">Welcome to #{roomName}!</h3>
+					<p class="text-discord-textMuted">This is the beginning of the #{roomName} room.</p>
+				</div>
+			{/if}
+
+			<!-- Load more indicator -->
+			{#if loadingOlder}
+				<div class="flex justify-center py-4">
+					<div class="w-6 h-6 border-2 border-discord-accent border-t-transparent rounded-full animate-spin"></div>
+				</div>
+			{/if}
 		</div>
 
 		<!-- Scroll to bottom button -->
-		{#if !isAtBottom && messages.length > 0}
+		{#if !isAtBottom && reversedMessages.length > 0}
 			<div class="absolute bottom-24 left-0 right-0 flex justify-center z-10 pointer-events-none">
 				<button
 					onclick={() => scrollToBottom(false)}

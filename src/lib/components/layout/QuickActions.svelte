@@ -144,7 +144,6 @@
 						bind:value={input1}
 						placeholder="#room:server.com"
 						class="w-full px-3 py-2 bg-discord-backgroundSecondary text-discord-textPrimary placeholder-discord-textMuted rounded border border-discord-divider focus:border-discord-accent focus:outline-none text-sm"
-						autofocus
 					/>
 				</div>
 			{/if}

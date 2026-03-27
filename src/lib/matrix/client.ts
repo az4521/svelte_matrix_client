@@ -579,6 +579,32 @@ export async function sendReadReceipt(event: MatrixEvent): Promise<void> {
 	await matrixClient.sendReadReceipt(event);
 }
 
+/** Returns the event ID the current user has read up to in this room, or null. */
+export function getReadUpToEventId(room: Room): string | null {
+	const userId = matrixClient?.getUserId();
+	if (!userId) return null;
+	return room.getEventReadUpTo(userId, true) ?? null;
+}
+
+export interface ReadReceiptInfo {
+	userId: string;
+	avatarUrl: string | null;
+	name: string;
+}
+
+/** Returns the list of other users whose latest read receipt is on this event. */
+export function getReceiptsForEvent(room: Room, event: MatrixEvent): ReadReceiptInfo[] {
+	const myId = matrixClient?.getUserId();
+	const receipts = room.getReceiptsForEvent(event);
+	return receipts
+		.filter((r) => r.userId !== myId && r.type === 'm.read')
+		.map((r) => ({
+			userId: r.userId,
+			avatarUrl: getMemberAvatar(room, r.userId),
+			name: getMemberName(room, r.userId),
+		}));
+}
+
 export async function sendTyping(roomId: string, isTyping: boolean): Promise<void> {
 	if (!matrixClient) return;
 	try {
