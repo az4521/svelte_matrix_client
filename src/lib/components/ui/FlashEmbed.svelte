@@ -45,9 +45,22 @@
 			suspended = false;
 		};
 	});
+
+	let wrapperEl: HTMLDivElement | undefined = $state();
+
+	$effect(() => {
+		if (!wrapperEl || !player) return;
+		const observer = new IntersectionObserver(([entry]) => {
+			if (!entry.isIntersecting) {
+				player.ruffle().suspend();
+			}
+		}, { threshold: 0 });
+		observer.observe(wrapperEl);
+		return () => observer.disconnect();
+	});
 </script>
 
-<div class="relative w-full max-w-sm mt-1 group/flash">
+<div bind:this={wrapperEl} class="relative w-full max-w-sm mt-1 group/flash">
 	<div bind:this={container} class="w-full aspect-video rounded-lg overflow-hidden bg-black"></div>
 	{#if player}
 		<button
