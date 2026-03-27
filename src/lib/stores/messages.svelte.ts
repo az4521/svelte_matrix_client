@@ -10,6 +10,7 @@ interface RoomMessages {
 export const messagesState = $state({
 	byRoom: {} as Record<string, RoomMessages>,
 	reactionTick: 0, // incremented whenever a reaction event arrives, to trigger re-renders
+	timelineTick: 0, // incremented whenever messages are set/appended, to trigger reply lookups
 });
 
 export function bumpReactionTick(): void {
@@ -27,6 +28,7 @@ export function setMessages(roomId: string, events: MatrixEvent[]): void {
 		isLoading: false,
 		canLoadMore: existing?.canLoadMore ?? true,
 	};
+	messagesState.timelineTick++;
 }
 
 export function appendMessage(roomId: string, event: MatrixEvent): void {
@@ -41,6 +43,7 @@ export function appendMessage(roomId: string, event: MatrixEvent): void {
 			...existing,
 			events: [...existing.events, event],
 		};
+		messagesState.timelineTick++;
 	} else {
 		messagesState.byRoom[roomId] = {
 			events: [event],

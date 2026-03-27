@@ -15,6 +15,8 @@
 		onEditEvent,
 		onRedactionEvent,
 		loadPreviousMessages,
+		loadMessagesUntilEvent,
+		loadContextAroundEvent,
 		getRoomDisplayName,
 		getRoomTopic,
 		sendReadReceipt,
@@ -111,17 +113,37 @@
 		return getPinnedEventIds(room).length;
 	});
 
-	function scrollToMessage(eventId: string) {
-		const el = document.querySelector(`[data-event-id="${eventId}"]`);
-		if (!el) return;
-		el.scrollIntoView({ behavior: "smooth", block: "center" });
-		el.classList.remove("message-highlight");
-		// Force reflow so re-triggering the animation works if called twice
-		void (el as HTMLElement).offsetWidth;
-		el.classList.add("message-highlight");
+	let jumpingToEventId = $state<string | null>(null);
+
+	async function scrollToMessage(eventId: string) {
+		let el = document.querySelector(`[data-event-id="${eventId}"]`);
+		if (!el) {
+			jumpingToEventId = eventId;
+			try {
+				const ctx = await loadContextAroundEvent(room, eventId);
+				if (ctx) {
+					contextMessages = ctx;
+					await tick();
+				}
+			} finally {
+				jumpingToEventId = null;
+			}
+			el = document.querySelector(`[data-event-id="${eventId}"]`);
+			if (!el) return;
+		}
+		const target = el as HTMLElement;
+		target.scrollIntoView({ behavior: "instant", block: "center" });
+		// Re-center after media/previews load in and shift layout
+		setTimeout(() => target.scrollIntoView({ behavior: "instant", block: "center" }), 150);
+		setTimeout(() => target.scrollIntoView({ behavior: "instant", block: "center" }), 600);
+		// Start highlight once layout has settled
 		setTimeout(() => {
-			el.classList.remove("message-highlight");
-		}, 2000);
+			target.scrollIntoView({ behavior: "instant", block: "center" });
+			target.classList.remove("message-highlight");
+			void target.offsetWidth;
+			target.classList.add("message-highlight");
+			setTimeout(() => target.classList.remove("message-highlight"), 2000);
+		}, 800);
 	}
 	let joiningUpgrade = $state(false);
 
@@ -342,16 +364,19 @@
 	const roomId = $derived(room.roomId);
 	const roomName = $derived(getRoomDisplayName(room));
 	const topic = $derived(getRoomTopic(room));
-	const messages = $derived(getMessages(roomId));
+	let contextMessages = $state<MatrixEvent[] | null>(null);
+	const messages = $derived(contextMessages ?? getMessages(roomId));
 	const reversedMessages = $derived(messages.toReversed());
+	const isContextView = $derived(contextMessages !== null);
 
 	// The event ID the user has read up to — used to show "New messages" divider on load
 	let unreadMarkerEventId = $state<string | null>(null);
 
-	// Clear reply when switching rooms
+	// Clear reply and context view when switching rooms
 	$effect(() => {
 		room.roomId; // track room changes
 		replyToEvent = null;
+		contextMessages = null;
 	});
 
 	// Load messages when room changes — always reload from SDK state (fast, in-memory)
@@ -498,7 +523,7 @@
 	}
 
 	async function loadOlderMessages() {
-		if (loadingOlder || !canLoadMore(roomId)) return;
+		if (loadingOlder || !canLoadMore(roomId) || isContextView) return;
 		loadingOlder = true;
 		const prevScrollTop = scrollEl?.scrollTop ?? 0;
 		const prevScrollHeight = scrollEl?.scrollHeight ?? 0;
@@ -848,6 +873,30 @@
 					</svg>
 					Jump to present
 				</button>
+			</div>
+		{/if}
+
+		<!-- Searching for unloaded message indicator -->
+		{#if jumpingToEventId}
+			<div class="absolute bottom-24 left-0 right-0 flex justify-center z-10 pointer-events-none">
+				<div class="bg-discord-backgroundSecondary text-discord-textMuted px-3 py-1.5 rounded-full shadow-lg text-sm border border-discord-divider flex items-center gap-2">
+					<div class="w-3.5 h-3.5 border-2 border-discord-accent border-t-transparent rounded-full animate-spin"></div>
+					Searching for message…
+				</div>
+			</div>
+		{/if}
+
+		<!-- Context view banner -->
+		{#if isContextView}
+			<div class="absolute top-12 left-0 right-0 flex justify-center z-10 pointer-events-none">
+				<div class="pointer-events-auto bg-discord-warning/20 text-discord-warning px-3 py-1.5 rounded-full shadow-lg text-sm border border-discord-warning/40 flex items-center gap-2">
+					<svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+					Viewing message context
+					<button
+						onclick={() => { contextMessages = null; setMessages(roomId, getTimelineMessages(room)); tick().then(() => scrollToBottom(true)); }}
+						class="ml-1 underline hover:no-underline"
+					>Return to live</button>
+				</div>
 			</div>
 		{/if}
 

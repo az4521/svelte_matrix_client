@@ -85,6 +85,9 @@ body {
 	--discord-bg-dark: #202226;
 	--discord-bg-hover: #32353b;
 	--discord-bg-selected: #282b30;
+	/* RGB channels for opacity modifier support */
+	--discord-bg-rgb: 54 57 63;
+	--discord-bg-secondary-rgb: 47 49 54;
 
 	/* ── Text ────────────────────────────────────────── */
 	--discord-text-primary: #dcddde;
@@ -98,6 +101,7 @@ body {
 	--discord-accent-rgb: var(--brand-500-rgb);
 	--discord-accent-hover-rgb: var(--brand-530-rgb);
 	--discord-danger-rgb: 237 66 69;
+	--discord-warning-rgb: 250 166 26;
 	--discord-divider: #41444e;
 
 	/* ── Status / role colours ───────────────────────── */

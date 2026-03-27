@@ -6,8 +6,8 @@ export default {
 			colors: {
 				discord: {
 					// Backgrounds
-					background: "var(--discord-bg)",
-					backgroundSecondary: "var(--discord-bg-secondary)",
+					background: "rgb(var(--discord-bg-rgb) / <alpha-value>)",
+					backgroundSecondary: "rgb(var(--discord-bg-secondary-rgb) / <alpha-value>)",
 					backgroundTertiary: "var(--discord-bg-tertiary)",
 					backgroundDark: "var(--discord-bg-dark)",
 					messageHover: "var(--discord-bg-hover)",
@@ -21,9 +21,9 @@ export default {
 						"rgb(var(--discord-accent-hover-rgb) / <alpha-value>)",
 					// Semantic
 					divider: "var(--discord-divider)",
-					danger: "var(--discord-danger)",
+					danger: "rgb(var(--discord-danger-rgb) / <alpha-value>)",
 					dangerHover: "var(--discord-danger-hover)",
-					warning: "var(--discord-warning)",
+					warning: "rgb(var(--discord-warning-rgb) / <alpha-value>)",
 					textPositive: "var(--discord-positive)",
 					// Status
 					online: "var(--discord-online)",

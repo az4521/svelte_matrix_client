@@ -211,7 +211,7 @@
 			| undefined,
 	);
 	const replyTarget = $derived(
-		inReplyToId ? findEventById(room, inReplyToId) : null,
+		(void messagesState.timelineTick, inReplyToId ? findEventById(room, inReplyToId) : null)
 	);
 	const replyTargetSender = $derived(
 		replyTarget ? getMemberName(room, replyTarget.getSender() ?? "") : null,
@@ -645,15 +645,30 @@
 					</span>
 				</div>
 			</div>
-		{:else if inReplyToId && !replyTarget}
-			<!-- Referenced event not in timeline -->
-			<div class="flex items-center gap-1 mb-1 opacity-50">
-				<div
-					class="w-0.5 h-4 bg-discord-textMuted rounded-full flex-shrink-0"
-				></div>
-				<span class="text-xs text-discord-textMuted italic"
-					>Original message not loaded</span
-				>
+		{:else if inReplyToId}
+			<!-- Referenced event not in timeline — clickable to load context -->
+			{@const fallbackLine = (() => {
+				const body: string = content?.body ?? '';
+				const line = body.split('\n')[0];
+				if (!line.startsWith('> ')) return null;
+				// Format: "> <@sender:server> text" or "> * <@sender:server> text"
+				const m = line.match(/^> (?:\* )?<(@[^>]+)> ?(.*)/);
+				return m ? { sender: m[1], text: m[2] } : null;
+			})()}
+			<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+			<div
+				class="flex items-start gap-1 mb-1 cursor-pointer opacity-60 hover:opacity-80 transition-opacity"
+				onclick={(e) => { e.preventDefault(); jumpToReply(inReplyToId); }}
+			>
+				<div class="w-0.5 bg-discord-textMuted rounded-full self-stretch flex-shrink-0"></div>
+				<div class="flex items-center gap-1.5 min-w-0">
+					{#if fallbackLine}
+						<span class="text-xs font-semibold text-discord-textSecondary flex-shrink-0">{fallbackLine.sender}</span>
+						<span class="text-xs text-discord-textMuted truncate">{fallbackLine.text || '…'}</span>
+					{:else}
+						<span class="text-xs text-discord-textMuted italic">Original message not loaded</span>
+					{/if}
+				</div>
 			</div>
 		{/if}
 

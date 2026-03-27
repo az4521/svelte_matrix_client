@@ -110,6 +110,7 @@ export async function register(
 		accessToken: response.access_token,
 		userId: response.user_id,
 		deviceId: response.device_id,
+		timelineSupport: true,
 	});
 
 	return {
@@ -131,6 +132,7 @@ export function reconnect(
 		accessToken,
 		userId,
 		deviceId,
+		timelineSupport: true,
 	});
 }
 
@@ -719,6 +721,40 @@ export async function loadPreviousMessages(room: Room): Promise<boolean> {
 	await matrixClient.scrollback(room, 30);
 	const after = room.getLiveTimeline().getEvents().length;
 	return after > before;
+}
+
+/** Pages backwards until `eventId` appears in the live timeline or `maxBatches` is exhausted.
+ *  Returns true if the event was found. */
+export async function loadMessagesUntilEvent(room: Room, eventId: string, maxBatches = 40): Promise<boolean> {
+	if (!matrixClient) return false;
+	for (let i = 0; i < maxBatches; i++) {
+		if (room.getLiveTimeline().getEvents().some(e => e.getId() === eventId)) return true;
+		const before = room.getLiveTimeline().getEvents().length;
+		await matrixClient.scrollback(room, 50);
+		const after = room.getLiveTimeline().getEvents().length;
+		if (after === before) return false; // no more history
+	}
+	return room.getLiveTimeline().getEvents().some(e => e.getId() === eventId);
+}
+
+/** Loads the timeline context around `eventId` without affecting the live timeline.
+ *  Returns filtered message events around that point, or null if unavailable. */
+export async function loadContextAroundEvent(room: Room, eventId: string, windowSize = 50): Promise<MatrixEvent[] | null> {
+	if (!matrixClient) return null;
+	const timelineSet = room.getUnfilteredTimelineSet();
+	const timeline = await matrixClient.getEventTimeline(timelineSet, eventId);
+	if (!timeline) return null;
+	const half = Math.floor(windowSize / 2);
+	await matrixClient.paginateEventTimeline(timeline, { backwards: true, limit: half });
+	await matrixClient.paginateEventTimeline(timeline, { backwards: false, limit: half });
+	const filter = (e: MatrixEvent) => {
+		if (e.isRedacted()) return false;
+		if (e.getType() !== 'm.room.message' && e.getType() !== 'm.sticker') return false;
+		const rel = e.getContent()?.['m.relates_to'];
+		if (rel?.rel_type === 'm.replace') return false;
+		return true;
+	};
+	return timeline.getEvents().filter(filter);
 }
 
 export async function sendReadReceipt(event: MatrixEvent): Promise<void> {
