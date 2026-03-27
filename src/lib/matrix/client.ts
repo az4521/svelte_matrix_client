@@ -451,8 +451,8 @@ export function mxcToHttp(
 	return `${baseUrl}/_matrix/client/v1/media/download/${serverName}/${mediaId}`;
 }
 
-/** Fetch a video from the homeserver with auth and return an object URL for use in <video src>. */
-export async function fetchVideoBlob(httpUrl: string): Promise<string> {
+/** Fetch an attachment from the homeserver with auth and return an object URL for use in <video/audio src> and file downloads. */
+export async function fetchAttachmentBlob(httpUrl: string): Promise<string> {
 	const token = matrixClient?.getAccessToken();
 	const headers: Record<string, string> = {};
 	if (token) headers["Authorization"] = `Bearer ${token}`;

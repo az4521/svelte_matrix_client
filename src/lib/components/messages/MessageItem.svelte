@@ -9,7 +9,7 @@
 		getMemberName,
 		getMemberAvatar,
 		mxcToHttp,
-		fetchVideoBlob,
+		fetchAttachmentBlob,
 		findEventById,
 		sendReaction,
 		sendEdit,
@@ -268,7 +268,7 @@
 		if (!httpUrl) return;
 		videoLoading = true;
 		let objectUrl: string | null = null;
-		fetchVideoBlob(httpUrl)
+		fetchAttachmentBlob(httpUrl)
 			.then((url) => {
 				objectUrl = url;
 				videoBlobUrl = url;
@@ -294,7 +294,7 @@
 		if (!httpUrl) return;
 		audioLoading = true;
 		let objectUrl: string | null = null;
-		fetchVideoBlob(httpUrl)
+		fetchAttachmentBlob(httpUrl)
 			.then((url) => {
 				objectUrl = url;
 				audioBlobUrl = url;
@@ -885,6 +885,10 @@
 				</div>
 			</div>
 		{:else if msgtype === "m.file"}
+			{@const fileUrl = mxcToHttp(content?.url as string)}
+			{@const fileSize = (content?.info as any)?.size}
+			{@const fileName = body()}
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
 				class="flex items-center gap-2 p-3 bg-discord-backgroundSecondary rounded-lg mt-1 max-w-sm w-full"
 			>
@@ -893,20 +897,32 @@
 					fill="currentColor"
 					viewBox="0 0 24 24"
 				>
-					<path
-						d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"
-					/>
+					<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z" />
 				</svg>
-				<div class="min-w-0">
-					<p
-						class="text-discord-textPrimary text-sm font-medium truncate"
-					>
-						{body()}
-					</p>
+				<div class="min-w-0 flex-1">
+					<p class="text-discord-textPrimary text-sm font-medium truncate">{fileName}</p>
 					<p class="text-discord-textMuted text-xs">
-						File attachment
+						{#if fileSize}{fileSize / 1024 < 1024 ? (fileSize / 1024).toFixed(1) + ' KB' : (fileSize / 1048576).toFixed(1) + ' MB'}{:else}File attachment{/if}
 					</p>
 				</div>
+				{#if fileUrl}
+					<button
+						onclick={async () => {
+							const blobUrl = await fetchAttachmentBlob(fileUrl);
+							const a = document.createElement('a');
+							a.href = blobUrl;
+							a.download = fileName;
+							a.click();
+							setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+						}}
+						class="p-1.5 rounded text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors flex-shrink-0"
+						title="Download"
+					>
+						<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+							<path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+						</svg>
+					</button>
+				{/if}
 			</div>
 		{:else if isEditing}
 			<div class="mt-1">
