@@ -8,7 +8,7 @@
 		removeFavouriteGif,
 	} from "$lib/stores/favourites.svelte";
 	import { IG_PROXY, FLASH_HOSTNAMES } from "$lib/config";
-	import FlashEmbed from "$lib/components/ui/FlashEmbed.svelte";
+	import SwfEmbed from "$lib/components/ui/SwfEmbed.svelte";
 
 	interface Props {
 		url: string;
@@ -240,7 +240,7 @@
 </script>
 
 {#if flashUrl}
-	<FlashEmbed src={flashUrl} />
+	<SwfEmbed getSrc={() => Promise.resolve(flashUrl)} />
 {:else if directEmbed?.type === "youtube"}
 	<iframe
 		src={directEmbed.embedUrl}

@@ -5,7 +5,7 @@
 	import Reactions from "$lib/components/messages/Reactions.svelte";
 	import LinkPreview from "$lib/components/messages/LinkPreview.svelte";
 	import Lightbox from "$lib/components/ui/Lightbox.svelte";
-	import FlashEmbed from "$lib/components/ui/FlashEmbed.svelte";
+	import SwfEmbed from "$lib/components/ui/SwfEmbed.svelte";
 	import {
 		getMemberName,
 		getMemberAvatar,
@@ -891,7 +891,7 @@
 			{@const fileName = body()}
 			{@const isSwf = fileName.toLowerCase().endsWith('.swf')}
 			{#if isSwf && fileUrl}
-				<FlashEmbed src={fileUrl} />
+				<SwfEmbed getSrc={() => fetchAttachmentBlob(fileUrl)} />
 			{/if}
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
