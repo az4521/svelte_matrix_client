@@ -119,6 +119,20 @@
 		refreshTimer = setTimeout(() => { refreshTimer = null; refreshRooms(); }, 50);
 	}
 
+	let hierarchyRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+	function scheduleHierarchyRefresh(spaceId: string) {
+		if (hierarchyRefreshTimer) return;
+		hierarchyRefreshTimer = setTimeout(() => {
+			hierarchyRefreshTimer = null;
+			if (roomsState.activeSpaceId !== spaceId) return;
+			fetchSpaceHierarchy(spaceId).then((hierarchy) => {
+				if (roomsState.activeSpaceId === spaceId) {
+					roomsState.spaceHierarchy = hierarchy;
+				}
+			});
+		}, 2000);
+	}
+
 	function refreshRooms() {
 		const layout = getSpaceLayout();
 		roomsState.spaceLayout = layout;
@@ -146,6 +160,7 @@
 		roomsState.invitedRooms = getInvitedRooms();
 		if (roomsState.activeSpaceId) {
 			roomsState.roomsInSpace = getRoomsInSpace(roomsState.activeSpaceId);
+			scheduleHierarchyRefresh(roomsState.activeSpaceId);
 		}
 		roomsState.roomsTick++;
 	}
