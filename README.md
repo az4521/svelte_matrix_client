@@ -6,7 +6,6 @@ things left to do:
 
 Messaging
 
-- Read receipts — showing who has read up to which message
 - Message search
 - Threads/replies as collapsible threads
 - Voice messages (m.audio recording)

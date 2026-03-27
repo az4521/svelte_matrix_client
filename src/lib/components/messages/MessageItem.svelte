@@ -25,12 +25,13 @@
 		room: Room;
 		showHeader: boolean;
 		onReply: (event: MatrixEvent) => void;
+		jumpToReply: (eventId: string) => void;
 		editRequested?: boolean;
 		onEditDone?: () => void;
 		receipts?: ReadReceiptInfo[];
 	}
 
-	let { event, room, showHeader, onReply, editRequested = false, onEditDone, receipts = [] }: Props = $props();
+	let { event, room, showHeader, onReply, jumpToReply, editRequested = false, onEditDone, receipts = [] }: Props = $props();
 
 	const canPin = $derived.by(() => {
 		const myPl = getMyPowerLevel(room);
@@ -316,13 +317,13 @@
 		return renderHtml(html, 'twemoji');
 	}
 
-	function formatTime(ts: number): string {
+	function formatTime(ts: number, timeOnly = false): string {
 		const d = new Date(ts);
 		const today = new Date();
 		const yesterday = new Date(today);
 		yesterday.setDate(yesterday.getDate() - 1);
 
-		if (d.toDateString() === today.toDateString()) return format(d, 'h:mm a');
+		if (d.toDateString() === today.toDateString() || timeOnly) return format(d, 'h:mm a');
 		if (d.toDateString() === yesterday.toDateString()) return 'Yesterday at ' + format(d, 'h:mm a');
 		return format(d, 'yyyy/MM/dd h:mm a')
 	}
@@ -472,7 +473,7 @@
 
 		<!-- Reply quote block -->
 		{#if replyTarget && replyTargetSender && replyTargetBody()}
-			<div class="flex items-start gap-1 mb-1 cursor-default">
+			<div class="flex items-start gap-1 mb-1 cursor-default cursor-pointer" onclick={(e) => { e.preventDefault(); jumpToReply(replyTarget.getId()!) }}>
 				<div class="w-0.5 bg-discord-textMuted rounded-full self-stretch flex-shrink-0 opacity-60"></div>
 				<div class="flex items-center gap-1.5 min-w-0">
 					<span class="text-xs font-semibold text-discord-textSecondary flex-shrink-0">
@@ -723,7 +724,7 @@
 		<!-- Inline timestamp (non-grouped messages, shows on hover) -->
 		{#if !showHeader}
 			<span class="absolute left-4 top-1/2 -translate-y-1/2 text-xs text-discord-textMuted opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none select-none">
-				{formatTime(timestamp)}
+				{formatTime(timestamp, true)}
 			</span>
 		{/if}
 	</div>

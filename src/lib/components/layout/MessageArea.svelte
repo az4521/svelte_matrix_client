@@ -104,6 +104,7 @@
 		// Force reflow so re-triggering the animation works if called twice
 		void (el as HTMLElement).offsetWidth;
 		el.classList.add('message-highlight');
+		setTimeout(()=>{el.classList.remove('message-highlight')}, 2000);
 	}
 	let joiningUpgrade = $state(false);
 
@@ -400,7 +401,6 @@
 	}
 
 	function scrollToBottom(instant: boolean) {
-		console.log('SCROLLTOBOTTOM')
 		if (!scrollEl) return;
 		if (!bottomAnchorEl) return;
 		bottomAnchorEl.scrollIntoView({
@@ -580,7 +580,7 @@
 		<div
 			bind:this={scrollEl}
 			onscroll={onScroll}
-			class="overflow-y-auto overflow-x-hidden py-4 flex flex-1 flex-col-reverse *:[overflow-anchor:none]"
+			class="overflow-y-auto overflow-x-hidden flex flex-1 flex-col-reverse *:[overflow-anchor:none]"
 		>
 			<div bind:this={bottomAnchorEl} class="{unreadMarkerEventId!=null?'![overflow-anchor:auto]':''} h-px"></div>
 
@@ -625,6 +625,7 @@
 					{room}
 					showHeader={shouldShowHeader(reversedMessages, i)}
 					onReply={(e) => { replyToEvent = e; }}
+					jumpToReply={scrollToMessage}
 					editRequested={editRequestedEventId === event.getId()}
 					onEditDone={() => messageInputEl?.focus()}
 					{receipts}
