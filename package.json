@@ -34,6 +34,7 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"@ruffle-rs/ruffle": "^0.2.0-nightly.2026.3.26",
 		"@twemoji/api": "^17.0.2",
 		"date-fns": "^4.1.0",
 		"lucide-svelte": "^0.509.0",

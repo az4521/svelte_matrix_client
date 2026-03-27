@@ -7,7 +7,8 @@
 		addFavouriteGif,
 		removeFavouriteGif,
 	} from "$lib/stores/favourites.svelte";
-	import { IG_PROXY } from "$lib/config";
+	import { IG_PROXY, FLASH_HOSTNAMES } from "$lib/config";
+	import FlashEmbed from "$lib/components/ui/FlashEmbed.svelte";
 
 	interface Props {
 		url: string;
@@ -226,9 +227,21 @@
 	const showInline = $derived(
 		isDirect || (isTenor && !!(preview?.videoUrl || preview?.imageUrl)),
 	);
+
+	const flashUrl = $derived.by(() => {
+		try {
+			const u = new URL(url);
+			if (!u.pathname.toLowerCase().endsWith('.swf')) return null;
+			if (FLASH_HOSTNAMES.length === 0) return null;
+			if (!FLASH_HOSTNAMES.includes(u.hostname)) return null;
+			return url;
+		} catch { return null; }
+	});
 </script>
 
-{#if directEmbed?.type === "youtube"}
+{#if flashUrl}
+	<FlashEmbed src={flashUrl} />
+{:else if directEmbed?.type === "youtube"}
 	<iframe
 		src={directEmbed.embedUrl}
 		class="mt-1 w-full max-w-sm aspect-video rounded-lg"

@@ -5,6 +5,7 @@
 	import Reactions from "$lib/components/messages/Reactions.svelte";
 	import LinkPreview from "$lib/components/messages/LinkPreview.svelte";
 	import Lightbox from "$lib/components/ui/Lightbox.svelte";
+	import FlashEmbed from "$lib/components/ui/FlashEmbed.svelte";
 	import {
 		getMemberName,
 		getMemberAvatar,
@@ -888,6 +889,10 @@
 			{@const fileUrl = mxcToHttp(content?.url as string)}
 			{@const fileSize = (content?.info as any)?.size}
 			{@const fileName = body()}
+			{@const isSwf = fileName.toLowerCase().endsWith('.swf')}
+			{#if isSwf && fileUrl}
+				<FlashEmbed src={fileUrl} />
+			{/if}
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
 				class="flex items-center gap-2 p-3 bg-discord-backgroundSecondary rounded-lg mt-1 max-w-sm w-full"
