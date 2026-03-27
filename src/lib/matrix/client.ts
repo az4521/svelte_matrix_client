@@ -749,6 +749,8 @@ export async function joinRoom(roomId: string, via?: string[]): Promise<void> {
 export async function joinRoomByAlias(alias: string): Promise<string> {
 	if (!matrixClient) throw new Error('Not logged in');
 	const result = await matrixClient.joinRoom(alias);
+	const room = matrixClient.getRoom(result.roomId);
+	if (room) await matrixClient.scrollback(room, 30).catch(() => {});
 	return result.roomId;
 }
 
@@ -760,6 +762,8 @@ export async function createRoom(name: string, topic: string): Promise<string> {
 		visibility: 'private' as any,
 		preset: 'private_chat' as any,
 	});
+	const room = matrixClient.getRoom(result.room_id);
+	if (room) await matrixClient.scrollback(room, 30).catch(() => {});
 	return result.room_id;
 }
 
@@ -782,6 +786,8 @@ export async function createDirectMessage(userId: string): Promise<string> {
 	const dmData: Record<string, string[]> = { ...(existing ?? {}) };
 	dmData[userId] = [...(dmData[userId] ?? []), roomId];
 	await matrixClient.setAccountData('m.direct', dmData);
+	const room = matrixClient.getRoom(roomId);
+	if (room) await matrixClient.scrollback(room, 30).catch(() => {});
 	return roomId;
 }
 
@@ -793,6 +799,8 @@ export function getInvitedRooms(): Room[] {
 export async function acceptInvite(roomId: string): Promise<void> {
 	if (!matrixClient) throw new Error('Not logged in');
 	await matrixClient.joinRoom(roomId);
+	const room = matrixClient.getRoom(roomId);
+	if (room) await matrixClient.scrollback(room, 30).catch(() => {});
 }
 
 export async function rejectInvite(roomId: string): Promise<void> {
