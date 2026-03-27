@@ -25,6 +25,7 @@
 		getRoom,
 		getReadUpToEventId,
 		getReceiptsForEvent,
+		onReceiptEvent,
 	} from "$lib/matrix/client";
 	import { setActiveRoom } from "$lib/stores/rooms.svelte";
 	import {
@@ -133,11 +134,18 @@
 			if (!el) return;
 		}
 		const target = el as HTMLElement;
-		intervalId = setInterval(() => target.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+		intervalId = setInterval(
+			() =>
+				target.scrollIntoView({ behavior: "smooth", block: "center" }),
+			50,
+		);
 		target.classList.remove("message-highlight");
 		void target.offsetWidth;
 		target.classList.add("message-highlight");
-		setTimeout(() => {target.classList.remove("message-highlight"); clearInterval(intervalId)}, 2000);
+		setTimeout(() => {
+			target.classList.remove("message-highlight");
+			clearInterval(intervalId);
+		}, 2000);
 	}
 	let joiningUpgrade = $state(false);
 
@@ -477,6 +485,14 @@
 		return unsub;
 	});
 
+	let receiptTick = $state(0);
+	$effect(() => {
+		const currentRoom = room;
+		return onReceiptEvent(currentRoom, () => {
+			receiptTick++;
+		});
+	});
+
 	function markAsRead() {
 		const msgs = getMessages(roomId);
 		const last = msgs[msgs.length - 1];
@@ -489,12 +505,6 @@
 
 	function scrollToBottom(instant: boolean) {
 		if (!scrollEl) return;
-		if (!bottomAnchorEl) return;
-		/*bottomAnchorEl.scrollIntoView({
-			behavior: instant ? 'instant' : 'smooth',
-			block: 'end',
-			container: 'nearest'
-		});*/
 		scrollEl.scrollTo({
 			top: scrollEl.scrollHeight,
 			behavior: instant ? "instant" : "smooth",
@@ -731,13 +741,15 @@
 		<div
 			bind:this={scrollEl}
 			onscroll={onScroll}
-			class="overflow-y-auto overflow-x-hidden flex flex-1 flex-col-reverse *:[overflow-anchor:none]"
+			class="overflow-y-auto overflow-x-hidden flex flex-1 flex-col-reverse{isAtBottom
+				? ' *:[overflow-anchor:none]'
+				: ''}"
 		>
 			<div
 				bind:this={bottomAnchorEl}
-				class="{unreadMarkerEventId != null
-					? '![overflow-anchor:auto]'
-					: ''} h-px"
+				class="{!unreadMarkerEventId && isAtBottom
+					? '![overflow-anchor:auto] '
+					: ''}h-px"
 			></div>
 
 			<!-- Room upgrade tombstone banner -->
@@ -780,7 +792,8 @@
 			<!-- Message list -->
 			{#each reversedMessages as event, i (event.getId())}
 				{@const dateLabel = showDateSeparator(reversedMessages, i)}
-				{@const receipts = getReceiptsForEvent(room, event)}
+				{@const receipts =
+					(void receiptTick, getReceiptsForEvent(room, event))}
 				{#if dateLabel}
 					<div class="flex items-center gap-4 px-4 my-4">
 						<div class="flex-1 h-px bg-discord-divider"></div>
@@ -872,9 +885,15 @@
 
 		<!-- Searching for unloaded message indicator -->
 		{#if jumpingToEventId}
-			<div class="absolute bottom-24 left-0 right-0 flex justify-center z-10 pointer-events-none">
-				<div class="bg-discord-backgroundSecondary text-discord-textMuted px-3 py-1.5 rounded-full shadow-lg text-sm border border-discord-divider flex items-center gap-2">
-					<div class="w-3.5 h-3.5 border-2 border-discord-accent border-t-transparent rounded-full animate-spin"></div>
+			<div
+				class="absolute bottom-24 left-0 right-0 flex justify-center z-10 pointer-events-none"
+			>
+				<div
+					class="bg-discord-backgroundSecondary text-discord-textMuted px-3 py-1.5 rounded-full shadow-lg text-sm border border-discord-divider flex items-center gap-2"
+				>
+					<div
+						class="w-3.5 h-3.5 border-2 border-discord-accent border-t-transparent rounded-full animate-spin"
+					></div>
 					Searching for message…
 				</div>
 			</div>
@@ -882,14 +901,30 @@
 
 		<!-- Context view banner -->
 		{#if isContextView}
-			<div class="absolute top-12 left-0 right-0 flex justify-center z-10 pointer-events-none">
-				<div class="pointer-events-auto bg-discord-warning/20 text-discord-warning px-3 py-1.5 rounded-full shadow-lg text-sm border border-discord-warning/40 flex items-center gap-2">
-					<svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+			<div
+				class="absolute top-12 left-0 right-0 flex justify-center z-10 pointer-events-none"
+			>
+				<div
+					class="pointer-events-auto bg-discord-warning/20 text-discord-warning px-3 py-1.5 rounded-full shadow-lg text-sm border border-discord-warning/40 flex items-center gap-2"
+				>
+					<svg
+						class="w-3.5 h-3.5 flex-shrink-0"
+						fill="currentColor"
+						viewBox="0 0 24 24"
+						><path
+							d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"
+						/></svg
+					>
 					Viewing message context
 					<button
-						onclick={() => { contextMessages = null; setMessages(roomId, getTimelineMessages(room)); tick().then(() => scrollToBottom(true)); }}
+						onclick={() => {
+							contextMessages = null;
+							setMessages(roomId, getTimelineMessages(room));
+							tick().then(() => scrollToBottom(true));
+						}}
 						class="ml-1 underline hover:no-underline"
-					>Return to live</button>
+						>Return to live</button
+					>
 				</div>
 			</div>
 		{/if}

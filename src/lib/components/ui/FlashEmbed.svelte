@@ -18,8 +18,8 @@
 			// Load Ruffle if not already loaded
 			if (!(window as any).RufflePlayer) {
 				await new Promise<void>((resolve, reject) => {
-					const script = document.createElement('script');
-					script.src = '/ruffle/ruffle.js';
+					const script = document.createElement("script");
+					script.src = "/ruffle/ruffle.js";
 					script.onload = () => resolve();
 					script.onerror = reject;
 					document.head.appendChild(script);
@@ -30,8 +30,8 @@
 			const ruffle = (window as any).RufflePlayer.newest();
 			localPlayer = ruffle.createPlayer();
 			if (!localPlayer) return;
-			localPlayer.style.width = '100%';
-			localPlayer.style.height = '100%';
+			localPlayer.style.width = "100%";
+			localPlayer.style.height = "100%";
 			container.appendChild(localPlayer);
 			localPlayer.ruffle().load({ url: currentSrc });
 			player = localPlayer;
@@ -50,18 +50,24 @@
 
 	$effect(() => {
 		if (!wrapperEl || !player) return;
-		const observer = new IntersectionObserver(([entry]) => {
-			if (!entry.isIntersecting) {
-				player.ruffle().suspend();
-			}
-		}, { threshold: 0 });
+		const observer = new IntersectionObserver(
+			([entry]) => {
+				if (!entry.isIntersecting) {
+					player.ruffle().suspend();
+				}
+			},
+			{ threshold: 0 },
+		);
 		observer.observe(wrapperEl);
 		return () => observer.disconnect();
 	});
 </script>
 
 <div bind:this={wrapperEl} class="relative w-full max-w-sm mt-1 group/flash">
-	<div bind:this={container} class="w-full aspect-video rounded-lg overflow-hidden bg-black"></div>
+	<div
+		bind:this={container}
+		class="w-full aspect-video rounded-lg overflow-hidden bg-black"
+	></div>
 	{#if player}
 		<button
 			onclick={() => player.ruffle().suspend()}
@@ -69,7 +75,7 @@
 			class="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/50 text-white opacity-0 group-hover/flash:opacity-100 transition-opacity hover:bg-black/70"
 		>
 			<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-				<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+				<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
 			</svg>
 		</button>
 	{/if}

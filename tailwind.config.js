@@ -7,7 +7,8 @@ export default {
 				discord: {
 					// Backgrounds
 					background: "rgb(var(--discord-bg-rgb) / <alpha-value>)",
-					backgroundSecondary: "rgb(var(--discord-bg-secondary-rgb) / <alpha-value>)",
+					backgroundSecondary:
+						"rgb(var(--discord-bg-secondary-rgb) / <alpha-value>)",
 					backgroundTertiary: "var(--discord-bg-tertiary)",
 					backgroundDark: "var(--discord-bg-dark)",
 					messageHover: "var(--discord-bg-hover)",

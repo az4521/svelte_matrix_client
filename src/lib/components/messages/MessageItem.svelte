@@ -211,7 +211,8 @@
 			| undefined,
 	);
 	const replyTarget = $derived(
-		(void messagesState.timelineTick, inReplyToId ? findEventById(room, inReplyToId) : null)
+		(void messagesState.timelineTick,
+		inReplyToId ? findEventById(room, inReplyToId) : null),
 	);
 	const replyTargetSender = $derived(
 		replyTarget ? getMemberName(room, replyTarget.getSender() ?? "") : null,
@@ -648,9 +649,9 @@
 		{:else if inReplyToId}
 			<!-- Referenced event not in timeline — clickable to load context -->
 			{@const fallbackLine = (() => {
-				const body: string = content?.body ?? '';
-				const line = body.split('\n')[0];
-				if (!line.startsWith('> ')) return null;
+				const body: string = content?.body ?? "";
+				const line = body.split("\n")[0];
+				if (!line.startsWith("> ")) return null;
 				// Format: "> <@sender:server> text" or "> * <@sender:server> text"
 				const m = line.match(/^> (?:\* )?<(@[^>]+)> ?(.*)/);
 				return m ? { sender: m[1], text: m[2] } : null;
@@ -658,15 +659,27 @@
 			<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 			<div
 				class="flex items-start gap-1 mb-1 cursor-pointer opacity-60 hover:opacity-80 transition-opacity"
-				onclick={(e) => { e.preventDefault(); jumpToReply(inReplyToId); }}
+				onclick={(e) => {
+					e.preventDefault();
+					jumpToReply(inReplyToId);
+				}}
 			>
-				<div class="w-0.5 bg-discord-textMuted rounded-full self-stretch flex-shrink-0"></div>
+				<div
+					class="w-0.5 bg-discord-textMuted rounded-full self-stretch flex-shrink-0"
+				></div>
 				<div class="flex items-center gap-1.5 min-w-0">
 					{#if fallbackLine}
-						<span class="text-xs font-semibold text-discord-textSecondary flex-shrink-0">{fallbackLine.sender}</span>
-						<span class="text-xs text-discord-textMuted truncate">{fallbackLine.text || '…'}</span>
+						<span
+							class="text-xs font-semibold text-discord-textSecondary flex-shrink-0"
+							>{fallbackLine.sender}</span
+						>
+						<span class="text-xs text-discord-textMuted truncate"
+							>{fallbackLine.text || "…"}</span
+						>
 					{:else}
-						<span class="text-xs text-discord-textMuted italic">Original message not loaded</span>
+						<span class="text-xs text-discord-textMuted italic"
+							>Original message not loaded</span
+						>
 					{/if}
 				</div>
 			</div>
@@ -904,7 +917,7 @@
 			{@const fileUrl = mxcToHttp(content?.url as string)}
 			{@const fileSize = (content?.info as any)?.size}
 			{@const fileName = body()}
-			{@const isSwf = fileName.toLowerCase().endsWith('.swf')}
+			{@const isSwf = fileName.toLowerCase().endsWith(".swf")}
 			{#if isSwf && fileUrl}
 				<SwfEmbed getSrc={() => fetchAttachmentBlob(fileUrl)} />
 			{/if}
@@ -917,29 +930,47 @@
 					fill="currentColor"
 					viewBox="0 0 24 24"
 				>
-					<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z" />
+					<path
+						d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"
+					/>
 				</svg>
 				<div class="min-w-0 flex-1">
-					<p class="text-discord-textPrimary text-sm font-medium truncate">{fileName}</p>
+					<p
+						class="text-discord-textPrimary text-sm font-medium truncate"
+					>
+						{fileName}
+					</p>
 					<p class="text-discord-textMuted text-xs">
-						{#if fileSize}{fileSize / 1024 < 1024 ? (fileSize / 1024).toFixed(1) + ' KB' : (fileSize / 1048576).toFixed(1) + ' MB'}{:else}File attachment{/if}
+						{#if fileSize}{fileSize / 1024 < 1024
+								? (fileSize / 1024).toFixed(1) + " KB"
+								: (fileSize / 1048576).toFixed(1) +
+									" MB"}{:else}File attachment{/if}
 					</p>
 				</div>
 				{#if fileUrl}
 					<button
 						onclick={async () => {
 							const blobUrl = await fetchAttachmentBlob(fileUrl);
-							const a = document.createElement('a');
+							const a = document.createElement("a");
 							a.href = blobUrl;
 							a.download = fileName;
 							a.click();
-							setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+							setTimeout(
+								() => URL.revokeObjectURL(blobUrl),
+								10000,
+							);
 						}}
 						class="p-1.5 rounded text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors flex-shrink-0"
 						title="Download"
 					>
-						<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-							<path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+						<svg
+							class="w-5 h-5"
+							fill="currentColor"
+							viewBox="0 0 24 24"
+						>
+							<path
+								d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"
+							/>
 						</svg>
 					</button>
 				{/if}

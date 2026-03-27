@@ -231,11 +231,13 @@
 	const flashUrl = $derived.by(() => {
 		try {
 			const u = new URL(url);
-			if (!u.pathname.toLowerCase().endsWith('.swf')) return null;
+			if (!u.pathname.toLowerCase().endsWith(".swf")) return null;
 			if (FLASH_HOSTNAMES.length === 0) return null;
 			if (!FLASH_HOSTNAMES.includes(u.hostname)) return null;
 			return url;
-		} catch { return null; }
+		} catch {
+			return null;
+		}
 	});
 </script>
 
