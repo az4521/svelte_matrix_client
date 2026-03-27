@@ -2,14 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body {
+html,
+body {
   overscroll-behavior-x: none;
 }
 
 @keyframes message-highlight-fade {
-  0%   { background-color: rgba(114, 137, 218, 0.35); }
-  70%  { background-color: rgba(114, 137, 218, 0.35); }
-  100% { background-color: transparent; }
+  0% {
+    background-color: rgba(114, 137, 218, 0.35);
+  }
+  70% {
+    background-color: rgba(114, 137, 218, 0.35);
+  }
+  100% {
+    background-color: transparent;
+  }
 }
 
 .message-highlight {
@@ -71,43 +78,42 @@ html, body {
   --brand-860-rgb: 17 21 33;
   --brand-900-rgb: 6 7 11;
 
-
   /* ── Backgrounds ─────────────────────────────────── */
-  --discord-bg:                  #36393f;
-  --discord-bg-secondary:        #2f3136;
-  --discord-bg-tertiary:         #202225;
-  --discord-bg-dark:             #202226;
-  --discord-bg-hover:            #32353b;
-  --discord-bg-selected:         #282b30;
+  --discord-bg: #36393f;
+  --discord-bg-secondary: #2f3136;
+  --discord-bg-tertiary: #202225;
+  --discord-bg-dark: #202226;
+  --discord-bg-hover: #32353b;
+  --discord-bg-selected: #282b30;
 
   /* ── Text ────────────────────────────────────────── */
-  --discord-text-primary:        #dcddde;
-  --discord-text-secondary:      #72767d;
-  --discord-text-muted:          #4f545c;
+  --discord-text-primary: #dcddde;
+  --discord-text-secondary: #72767d;
+  --discord-text-muted: #4f545c;
 
   /* ── Semantic accents ────────────────────────────── */
-  --discord-accent:              var(--brand-500);
-  --discord-accent-hover:        var(--brand-530);
+  --discord-accent: var(--brand-500);
+  --discord-accent-hover: var(--brand-530);
   /* RGB channels for opacity modifier support (e.g. bg-discord-accent/30) */
-  --discord-accent-rgb:          var(--brand-500-rgb);
-  --discord-accent-hover-rgb:    var(--brand-530-rgb);
-  --discord-danger-rgb:          237 66 69;
-  --discord-divider:             #41444e;
+  --discord-accent-rgb: var(--brand-500-rgb);
+  --discord-accent-hover-rgb: var(--brand-530-rgb);
+  --discord-danger-rgb: 237 66 69;
+  --discord-divider: #41444e;
 
   /* ── Status / role colours ───────────────────────── */
-  --discord-online:              #3ba55c;
-  --discord-idle:                #faa61a;
-  --discord-dnd:                 #ed4245;
-  --discord-offline:             #747f8d;
-  --discord-danger:              #ed4245;
-  --discord-danger-hover:        #c03537;
-  --discord-warning:             #faa61a;
-  --discord-positive:            #23a559;
-  --discord-star:                #faa61a;
+  --discord-online: #3ba55c;
+  --discord-idle: #faa61a;
+  --discord-dnd: #ed4245;
+  --discord-offline: #747f8d;
+  --discord-danger: #ed4245;
+  --discord-danger-hover: #c03537;
+  --discord-warning: #faa61a;
+  --discord-positive: #23a559;
+  --discord-star: #faa61a;
 
   /* ── Spoiler ─────────────────────────────────────── */
-  --discord-spoiler-bg:          #1e1f22;
-  --discord-spoiler-revealed-bg: rgba(255,255,255,0.1);
+  --discord-spoiler-bg: #1e1f22;
+  --discord-spoiler-revealed-bg: rgba(255, 255, 255, 0.1);
 
   /* ── Avatar palette (deterministic bg colours) ───── */
   --avatar-color-0: var(--brand-500);
@@ -131,7 +137,7 @@ body {
   padding: 0;
   background-color: var(--discord-bg);
   color: var(--discord-text-primary);
-  font-family: 'gg sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-family: "gg sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
 #app {
@@ -233,9 +239,21 @@ body {
 }
 
 /* Headings */
-.message-body h1 { font-size: 1.5rem; font-weight: 700; margin: 0.25rem 0; }
-.message-body h2 { font-size: 1.25rem; font-weight: 700; margin: 0.25rem 0; }
-.message-body h3 { font-size: 1.05rem; font-weight: 700; margin: 0.25rem 0; }
+.message-body h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0.25rem 0;
+}
+.message-body h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0.25rem 0;
+}
+.message-body h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0.25rem 0;
+}
 
 /* Subtext (-#) */
 .message-body small {
