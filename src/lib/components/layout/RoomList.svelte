@@ -180,40 +180,27 @@
 	{/if}
 
 	<!-- Room list -->
-	<div class="flex-1 overflow-y-auto py-2">
+	<div class="flex-1 overflow-y-auto">
 
-		<!-- Pending invites -->
-		{#if roomsState.invitedRooms.length > 0}
-			<div class="px-2 mb-2">
-				<p class="px-2 py-1 text-xs font-semibold text-discord-textMuted uppercase tracking-wide">Invites</p>
-				{#each roomsState.invitedRooms as room (room.roomId)}
-					{@const busy = inviteActionIds.has(room.roomId)}
-					{@const sender = getInviteSender(room)}
-					<div class="flex flex-col gap-1.5 px-2 py-2 rounded bg-discord-messageHover mb-1">
-						<div class="flex items-center gap-2 min-w-0">
-							<Avatar src={getRoomAvatar(room)} name={getRoomDisplayName(room)} size={24} />
-							<div class="flex-1 min-w-0">
-								<p class="text-sm font-semibold text-discord-textPrimary truncate">{getRoomDisplayName(room)}</p>
-								{#if sender}
-									<p class="text-xs text-discord-textMuted truncate">from {sender}</p>
-								{/if}
-							</div>
-						</div>
-						<div class="flex gap-1.5">
-							<button
-								onclick={() => handleAccept(room.roomId)}
-								disabled={busy}
-								class="flex-1 py-1 rounded text-xs font-semibold bg-discord-accent hover:bg-discord-accentHover text-white transition-colors disabled:opacity-50"
-							>Accept</button>
-							<button
-								onclick={() => handleReject(room.roomId)}
-								disabled={busy}
-								class="flex-1 py-1 rounded text-xs font-semibold bg-discord-background hover:bg-discord-danger text-discord-textMuted hover:text-white transition-colors disabled:opacity-50"
-							>Reject</button>
-						</div>
-					</div>
-				{/each}
-			</div>
+		<!-- Inbox button (home view only) -->
+		{#if !roomsState.activeSpaceId}
+			<button
+				onclick={() => { roomsState.showInbox = true; roomsState.activeRoomId = null; }}
+				class="mb-2 w-full flex items-center gap-2 pr-2 py-1.5 transition-colors text-left"
+				class:text-discord-textPrimary={roomsState.showInbox}
+				class:text-discord-textMuted={!roomsState.showInbox}
+				class:hover:bg-discord-messageHover={!roomsState.showInbox}
+				class:hover:text-discord-textPrimary={!roomsState.showInbox}
+				style={roomsState.showInbox ? 'border-left: 3px solid var(--discord-accent); background: linear-gradient(to right, var(--discord-bg-selected) 85%, var(--discord-bg-secondary)); padding-left: calc(0.5rem - 3px);' : 'padding-left: 0.5rem;'}
+			>
+				<svg class="w-4 h-4 flex-shrink-0 opacity-70" fill="currentColor" viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/></svg>
+				<span class="flex-1 text-sm truncate">Pending Invites</span>
+				{#if roomsState.invitedRooms.length > 0}
+					<span class="flex-shrink-0 bg-discord-danger text-white text-xs font-bold rounded-full px-1.5 min-w-[1.2rem] text-center">
+						{roomsState.invitedRooms.length}
+					</span>
+				{/if}
+			</button>
 		{/if}
 
 		<!-- Joined rooms / channels -->
@@ -293,7 +280,7 @@
 
 		<!-- Direct messages -->
 		{#if showDMs}
-			<div class="px-2 mb-2">
+			<div class="mb-2">
 				<p class="px-2 py-1 text-xs font-semibold text-discord-textMuted uppercase tracking-wide">
 					Direct Messages
 				</p>

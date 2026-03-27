@@ -60,30 +60,30 @@
 </script>
 
 <!-- Action buttons -->
-<div class="px-2 pt-2 pb-1 flex flex-col gap-1">
+<div class="flex flex-col">
 	<button
 		onclick={() => open('create-dm')}
-		class="flex-1 flex items-center gap-1 py-1 px-2 rounded text-xs text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors"
-		title="New direct message"
+		class="w-full flex items-center gap-2 pr-2 py-1.5 text-left text-sm text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors"
+		style="padding-left: 0.5rem;"
 	>
-		<svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
-		New DM
+		<svg class="w-4 h-4 flex-shrink-0 opacity-70" fill="currentColor" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+		<span class="flex-1 truncate">New DM</span>
 	</button>
 	<button
 		onclick={() => open('create-room')}
-		class="flex-1 flex items-center gap-1 py-1 px-2 rounded text-xs text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors"
-		title="Create room"
+		class="w-full flex items-center gap-2 pr-2 py-1.5 text-left text-sm text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors"
+		style="padding-left: 0.5rem;"
 	>
-		<svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
-		Create new room
+		<svg class="w-4 h-4 flex-shrink-0 opacity-70" fill="currentColor" viewBox="0 0 24 24"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
+		<span class="flex-1 truncate">Create new room</span>
 	</button>
 	<button
 		onclick={() => open('join-room')}
-		class="flex-1 flex items-center gap-1 py-1 px-2 rounded text-xs text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors"
-		title="Join room by address"
+		class="w-full flex items-center gap-2 pr-2 py-1.5 text-left text-sm text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors"
+		style="padding-left: 0.5rem;"
 	>
-		<svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M11 7 9.6 8.4l2.6 2.6H2v2h10.2l-2.6 2.6L11 17l5-5-5-5zm9 12h-8v2h8c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-8v2h8v14z"/></svg>
-		Join room by address
+		<svg class="w-4 h-4 flex-shrink-0 opacity-70" fill="currentColor" viewBox="0 0 24 24"><path d="M11 7 9.6 8.4l2.6 2.6H2v2h10.2l-2.6 2.6L11 17l5-5-5-5zm9 12h-8v2h8c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-8v2h8v14z"/></svg>
+		<span class="flex-1 truncate">Join room by address</span>
 	</button>
 </div>
 

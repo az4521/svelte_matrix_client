@@ -42,6 +42,7 @@ export const roomsState = $state({
 	invitedRooms: [] as Room[],
 	activeSpaceId: loadLastSpace() as string | null,
 	activeRoomId: getLastRoom(loadLastSpace()) as string | null,
+	showInbox: false,
 	roomsInSpace: [] as Room[],
 	spaceHierarchy: [] as SpaceChildInfo[],
 	hierarchyLoading: false,
@@ -65,6 +66,7 @@ export function setActiveSpace(spaceId: string | null): void {
 
 export function setActiveRoom(roomId: string): void {
 	roomsState.activeRoomId = roomId;
+	roomsState.showInbox = false;
 	saveLastRoom(roomsState.activeSpaceId, roomId);
 }
 

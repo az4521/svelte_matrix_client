@@ -6,6 +6,7 @@
 	import RoomList from '$lib/components/layout/RoomList.svelte';
 	import MessageArea from '$lib/components/layout/MessageArea.svelte';
 	import RoomSettings from '$lib/components/layout/RoomSettings.svelte';
+	import InboxPanel from '$lib/components/layout/InboxPanel.svelte';
 
 	import { auth, clearSession } from '$lib/stores/auth.svelte';
 	import { roomsState, setActiveSpace } from '$lib/stores/rooms.svelte';
@@ -286,7 +287,9 @@
 		{/if}
 
 		<main class="flex flex-1 min-w-0 overflow-hidden bg-discord-background">
-			{#if activeRoom}
+			{#if roomsState.showInbox}
+				<InboxPanel />
+			{:else if activeRoom}
 				<MessageArea
 					room={activeRoom}
 					isMobile={mobileState.isMobile}
