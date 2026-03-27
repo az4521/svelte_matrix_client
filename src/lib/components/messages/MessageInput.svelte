@@ -169,7 +169,7 @@
 			for (const shortcode of shortcodes) {
 				const mxcUrl = lookup.get(shortcode);
 				if (mxcUrl) {
-					const tag = `<img data-mx-emoticon src="${mxcUrl}" alt=":${shortcode}:" title=":${shortcode}:" height="32" />`;
+					const tag = `<img data-mx-emoticon src="${mxcUrl}" alt=":${shortcode}:" title=":${shortcode}:" />`;
 					html = html.replaceAll(`:${shortcode}:`, tag);
 					changed = true;
 				}

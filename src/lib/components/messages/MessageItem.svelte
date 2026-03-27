@@ -1275,7 +1275,7 @@
 
 	/* Custom emoji (data-mx-emoticon) inline size */
 	:global([data-mx-emoticon]) {
-		height: 1.25em;
+		height: 1.25em!important;
 		width: auto;
 		vertical-align: -0.25em;
 		display: inline-block;
@@ -1283,7 +1283,7 @@
 	}
 
 	:global(.emoji-only [data-mx-emoticon]) {
-		height: 36px;
+		height: 36px!important;
 		width: auto;
 		vertical-align: -0.4em;
 	}
