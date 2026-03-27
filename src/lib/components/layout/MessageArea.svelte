@@ -536,8 +536,8 @@
 
 	// Group consecutive messages from the same sender (within 5 min)
 	function shouldShowHeader(events: MatrixEvent[], index: number): boolean {
-		if (index === 0) return true;
-		const prev = events[index - 1];
+		if (index + 1 >= events.length) return true;
+		const prev = events[index + 1];
 		const curr = events[index];
 		if (prev.getSender() !== curr.getSender()) return true;
 		const timeDiff = curr.getTs() - prev.getTs();
