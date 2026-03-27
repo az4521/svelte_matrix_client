@@ -52,8 +52,8 @@
 	const canBan = $derived(myPowerLevel >= pl.ban);
 
 	// ── General tab ────────────────────────────────────────────────────────────
-	let nameInput = $state(room.name ?? "");
-	let topicInput = $state(getRoomTopic(room) ?? "");
+	let nameInput = $state(untrack(() => room.name ?? ""));
+	let topicInput = $state(untrack(() => getRoomTopic(room) ?? ""));
 	let avatarUploading = $state(false);
 	let generalSaving = $state(false);
 	let generalError = $state("");
@@ -99,8 +99,8 @@
 	}
 
 	// ── Access tab ─────────────────────────────────────────────────────────────
-	let joinRule = $state(getJoinRule(room));
-	let historyVisibility = $state(getHistoryVisibility(room));
+	let joinRule = $state(untrack(() => getJoinRule(room)));
+	let historyVisibility = $state(untrack(() => getHistoryVisibility(room)));
 	let accessSaving = $state(false);
 	let accessError = $state("");
 	let accessSuccess = $state(false);
@@ -127,13 +127,13 @@
 	}
 
 	// ── Permissions tab ────────────────────────────────────────────────────────
-	let plBan = $state(pl.ban);
-	let plKick = $state(pl.kick);
-	let plRedact = $state(pl.redact);
-	let plInvite = $state(pl.invite);
-	let plEventsDefault = $state(pl.events_default);
-	let plStateDefault = $state(pl.state_default);
-	let plUsersDefault = $state(pl.users_default);
+	let plBan = $state(untrack(() => pl.ban));
+	let plKick = $state(untrack(() => pl.kick));
+	let plRedact = $state(untrack(() => pl.redact));
+	let plInvite = $state(untrack(() => pl.invite));
+	let plEventsDefault = $state(untrack(() => pl.events_default));
+	let plStateDefault = $state(untrack(() => pl.state_default));
+	let plUsersDefault = $state(untrack(() => pl.users_default));
 	let permSaving = $state(false);
 	let permError = $state("");
 	let permSuccess = $state(false);
@@ -341,7 +341,7 @@
 		{ id: "access", label: "Access" },
 		{ id: "permissions", label: "Permissions" },
 		{ id: "members", label: "Members" },
-		...(isSpace ? [{ id: "rooms" as Tab, label: "Rooms" }] : []),
+		...(untrack(()=>isSpace) ? [{ id: "rooms" as Tab, label: "Rooms" }] : []),
 	];
 </script>
 

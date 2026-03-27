@@ -640,7 +640,7 @@
 						{replyTargetSender}
 					</span>
 					<span
-						class="text-xs text-discord-textMuted truncate opacity-80"
+						class="text-xs text-discord-textSecondary truncate opacity-80"
 					>
 						{replyTargetBody()}
 					</span>
