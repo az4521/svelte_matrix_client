@@ -29,7 +29,6 @@
     } from "$lib/stores/messages.svelte";
     import { roomsState } from "$lib/stores/rooms.svelte";
     import { auth } from "$lib/stores/auth.svelte";
-    import { INLINE_MEDIA_HOSTNAMES } from "$lib/config";
     import { tick } from "svelte";
     import { format } from "date-fns";
     import { renderHtml } from "$lib/utils/twemoji";
@@ -80,7 +79,7 @@
     let emojiPickerEl: HTMLDivElement | undefined = $state();
 
     $effect(() => {
-        if (showEmojiPicker && !mobileState.isMobile) {
+        if (showEmojiPicker && !mobileState.isTouchscreen) {
             const handler = (e: MouseEvent) => {
                 if (
                     emojiPickerEl &&
@@ -97,7 +96,7 @@
 
     let keyboardOffset = $state(0);
     $effect(() => {
-        if (!mobileState.isMobile) {
+        if (!mobileState.isTouchscreen) {
             keyboardOffset = 0;
             return;
         }
@@ -165,7 +164,7 @@
     const reactionTick = $derived(messagesState.reactionTick);
     const eventId = $derived(event.getId() ?? "");
     const mobileSelected = $derived(
-        mobileState.isMobile && mobileState.selectedMessageId === eventId,
+        mobileState.isTouchscreen && mobileState.selectedMessageId === eventId,
     );
     const isOwnMessage = $derived(event.getSender() === auth.userId);
     const isEdited = $derived.by(() => {
@@ -342,51 +341,11 @@
         content?.["m.relates_to"]?.rel_type === "m.thread",
     );
 
-    // Extract configured inline-media hostnames from both plain body and <a href> in formatted body
-    const inlineMediaUrls = $derived.by(() => {
-        if (msgtype !== "m.text") return [];
-        const seen = new Set<string>();
-        const urls: string[] = [];
-        const add = (url: string) => {
-            try {
-                if (
-                    INLINE_MEDIA_HOSTNAMES.includes(new URL(url).hostname) &&
-                    !seen.has(url)
-                ) {
-                    seen.add(url);
-                    urls.push(url);
-                }
-            } catch {}
-        };
-        (body().match(/https?:\/\/[^\s<>"')\]]+/g) ?? []).forEach(add);
-        const fb = formattedBody();
-        if (fb) {
-            const hrefRe = /href="([^"]+)"/g;
-            let m;
-            while ((m = hrefRe.exec(fb)) !== null) add(m[1]);
-        }
-        return urls;
-    });
-
-    function inlineMediaType(url: string): "image" | "video" | "audio" | null {
-        try {
-            const path = new URL(url).pathname.toLowerCase();
-            if (/\.(jpe?g|png|gif|webp|avif|heic?|bmp)$/.test(path))
-                return "image";
-            if (/\.(mp4|webm|mov|avi|mkv|m4v)$/.test(path)) return "video";
-            if (/\.(mp3|ogg|wav|flac|aac|m4a|caf|opus)$/.test(path))
-                return "audio";
-        } catch {}
-        return null;
-    }
-
-    // Extract http/https URLs from the plain body for inline media previews
+    // Extract http/https URLs from the plain body for link previews
     const linkedUrls = $derived.by(() => {
         if (msgtype !== "m.text") return [];
-        const inlineSet = new Set(inlineMediaUrls);
         const matches = body().match(/https?:\/\/[^\s<>"')\]]+/g) ?? [];
-        // Deduplicate while preserving order; exclude inline media URLs (rendered separately)
-        return [...new Set(matches)].filter((u) => !inlineSet.has(u));
+        return [...new Set(matches)];
     });
 
     // True if the body text consists entirely of emoji + whitespace (no other characters)
@@ -549,14 +508,14 @@
 {#if showEmojiPicker}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <!-- svelte-ignore a11y_click_events_have_key_events -->
-    {#if mobileState.isMobile}<div
+    {#if mobileState.isTouchscreen}<div
             class="fixed inset-0 z-40"
             onclick={() => {
                 showEmojiPicker = false;
                 mobileState.selectedMessageId = null;
             }}
         ></div>{/if}
-    {#if mobileState.isMobile}
+    {#if mobileState.isTouchscreen}
         <div
             class="fixed left-0 right-0 z-50"
             style="bottom: {keyboardOffset}px;"
@@ -584,7 +543,7 @@
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
     bind:this={rootEl}
-    class="{mobileState.isMobile
+    class="{mobileState.isTouchscreen
         ? ''
         : 'group hover:bg-discord-messageHover'} relative flex gap-3 px-4 py-0.5 rounded transition-colors"
     class:pt-3={showHeader}
@@ -593,7 +552,7 @@
         if (!confirmingDelete) return;
     }}
     onclick={() => {
-        if (mobileState.isMobile)
+        if (mobileState.isTouchscreen)
             mobileState.selectedMessageId = mobileSelected ? null : eventId;
     }}
     data-event-id={eventId}
@@ -1023,26 +982,6 @@
             {#each linkedUrls as url (url)}
                 <LinkPreview {url} />
             {/each}
-            {#each inlineMediaUrls as url (url)}
-                {@const mediaType = inlineMediaType(url)}
-                {#if mediaType === "image"}
-                    <img
-                        src={url}
-                        alt=""
-                        class="max-w-sm w-full max-h-72 rounded-lg mt-1 block object-contain bg-black/10"
-                    />
-                {:else if mediaType === "video"}
-                    <!-- svelte-ignore a11y_media_has_caption -->
-                    <video
-                        src={url}
-                        controls
-                        class="max-w-sm w-full max-h-72 rounded-lg mt-1 block"
-                    ></video>
-                {:else if mediaType === "audio"}
-                    <!-- svelte-ignore a11y_media_has_caption -->
-                    <audio src={url} controls class="w-full mt-1"></audio>
-                {/if}
-            {/each}
         {/if}
 
         <!-- Thread badge -->
@@ -1199,7 +1138,7 @@
                     />
                 </svg>
             </button>
-            {#if showEmojiPicker && !mobileState.isMobile}
+            {#if showEmojiPicker && !mobileState.isTouchscreen}
                 <div
                     bind:this={emojiPickerEl}
                     class={emojiPickerBelow

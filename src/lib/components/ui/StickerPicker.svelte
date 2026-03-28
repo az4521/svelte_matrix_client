@@ -29,7 +29,7 @@
     const COLS = 4;
 
     $effect(() => {
-        if (!mobileState.isMobile) searchEl?.focus();
+        if (!mobileState.isTouchscreen) searchEl?.focus();
     });
 
     $effect(() => {
@@ -226,13 +226,15 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-    class="{mobileState.isMobile
+    class="{mobileState.isTouchscreen
         ? 'w-full rounded-t-xl'
         : 'w-72 rounded-xl'} bg-discord-backgroundSecondary border border-discord-divider shadow-2xl flex flex-col"
-    style={mobileState.isMobile ? "max-height: 50dvh;" : "max-height: 380px;"}
+    style={mobileState.isTouchscreen
+        ? "max-height: 50dvh;"
+        : "max-height: 380px;"}
     onkeydown={onKeydown}
 >
-    {#if mobileState.isMobile}
+    {#if mobileState.isTouchscreen}
         <div class="flex border-b border-discord-divider flex-shrink-0">
             {#if onSwitchToEmoji}<button
                     onclick={onSwitchToEmoji}

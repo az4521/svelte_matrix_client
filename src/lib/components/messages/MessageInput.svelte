@@ -96,7 +96,7 @@
     // Track keyboard height on mobile so pickers stay above it
     let keyboardOffset = $state(0);
     $effect(() => {
-        if (!mobileState.isMobile) {
+        if (!mobileState.isTouchscreen) {
             keyboardOffset = 0;
             return;
         }
@@ -248,7 +248,7 @@
                 behavior: "smooth",
             });
         }
-        if (e.key === "Enter" && !e.shiftKey && !mobileState.isMobile) {
+        if (e.key === "Enter" && !e.shiftKey && !mobileState.isTouchscreen) {
             e.preventDefault();
             send();
         }
@@ -520,7 +520,7 @@
             <button
                 onclick={() => openPicker("gif")}
                 {disabled}
-                class="{mobileState.isMobile
+                class="{mobileState.isTouchscreen
                     ? 'hidden'
                     : ''} p-1.5 rounded text-discord-textMuted hover:text-discord-textPrimary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 title="Favourite GIFs"
@@ -538,7 +538,7 @@
                     onclick={() => (showGifPicker = false)}
                     onkeydown={() => (showGifPicker = false)}
                 ></div>
-                {#if mobileState.isMobile}
+                {#if mobileState.isTouchscreen}
                     <div
                         class="fixed left-0 right-0 z-50"
                         style="bottom: {keyboardOffset}px;"
@@ -567,7 +567,7 @@
         <div class="relative flex-shrink-0">
             <button
                 onclick={() => openPicker("sticker")}
-                class="{mobileState.isMobile
+                class="{mobileState.isTouchscreen
                     ? 'hidden'
                     : ''} p-1.5 rounded text-discord-textMuted hover:text-discord-textPrimary transition-colors"
                 title="Stickers"
@@ -586,7 +586,7 @@
                     onclick={() => (showStickerPicker = false)}
                     onkeydown={() => (showStickerPicker = false)}
                 ></div>
-                {#if mobileState.isMobile}
+                {#if mobileState.isTouchscreen}
                     <div
                         class="fixed left-0 right-0 z-50"
                         style="bottom: {keyboardOffset}px;"
@@ -634,7 +634,7 @@
                     class="fixed inset-0 z-40"
                     onclick={() => (showEmojiPicker = false)}
                 ></div>
-                {#if mobileState.isMobile}
+                {#if mobileState.isTouchscreen}
                     <div
                         class="fixed left-0 right-0 z-50"
                         style="bottom: {keyboardOffset}px;"
@@ -688,7 +688,7 @@
             >
                 {typingText()}
             </p>
-        {:else if !mobileState.isMobile}
+        {:else if !mobileState.isTouchscreen}
             <p class="text-xs text-discord-textMuted">
                 <kbd class="font-mono">Enter</kbd> to send &middot;
                 <kbd class="font-mono">Shift+Enter</kbd> for new line

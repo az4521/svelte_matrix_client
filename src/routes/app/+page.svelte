@@ -203,12 +203,20 @@
         refreshRooms();
 
         const mq = window.matchMedia("(max-width: 767px)");
+        const pq = window.matchMedia("(pointer: coarse)");
+        const hq = window.matchMedia("(hover: none)");
         mobileState.isMobile = mq.matches;
+        mobileState.isTouchscreen = hq.matches || pq.matches;
         const onMqChange = (e: MediaQueryListEvent) => {
             mobileState.isMobile = e.matches;
             if (!e.matches) mobileState.leftOpen = false;
         };
+        const onPqHqChange = () => {
+            mobileState.isTouchscreen = hq.matches || pq.matches;
+        };
         mq.addEventListener("change", onMqChange);
+        pq.addEventListener("change", onPqHqChange);
+        hq.addEventListener("change", onPqHqChange);
 
         const unsubRooms = onRoomUpdate(() => scheduleRefreshRooms());
         const unsubTimeline = onTimelineEvent(() => bumpUnreadTick());

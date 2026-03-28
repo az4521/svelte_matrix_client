@@ -7,7 +7,11 @@
         addFavouriteGif,
         removeFavouriteGif,
     } from "$lib/stores/favourites.svelte";
-    import { IG_PROXY, FLASH_HOSTNAMES } from "$lib/config";
+    import {
+        IG_PROXY,
+        FLASH_HOSTNAMES,
+        INLINE_MEDIA_HOSTNAMES,
+    } from "$lib/config";
     import SwfEmbed from "$lib/components/ui/SwfEmbed.svelte";
 
     interface Props {
@@ -239,10 +243,52 @@
             return null;
         }
     });
+
+    function getInlineMediaType(u: string): "image" | "video" | "audio" | null {
+        try {
+            const path = new URL(u).pathname.toLowerCase();
+            if (/\.(jpe?g|png|gif|webp|avif|heic?|bmp)$/.test(path))
+                return "image";
+            if (/\.(mp4|webm|mov|avi|mkv|m4v)$/.test(path)) return "video";
+            if (/\.(mp3|ogg|wav|flac|aac|m4a|caf|opus)$/.test(path))
+                return "audio";
+        } catch {}
+        return null;
+    }
+
+    const inlineMediaType = $derived.by(() => {
+        try {
+            if (!INLINE_MEDIA_HOSTNAMES.includes(new URL(url).hostname))
+                return null;
+            return getInlineMediaType(url);
+        } catch {
+            return null;
+        }
+    });
 </script>
 
 {#if flashUrl}
     <SwfEmbed getSrc={() => Promise.resolve(flashUrl)} />
+{:else if inlineMediaType && !preview && !directEmbed && !tweetEmbed}
+    {#if inlineMediaType === "image"}
+        <img
+            src={url}
+            alt=""
+            class="max-w-sm w-full max-h-72 rounded-lg mt-1 block object-contain bg-black/10"
+            loading="lazy"
+        />
+    {:else if inlineMediaType === "video"}
+        <!-- svelte-ignore a11y_media_has_caption -->
+        <video
+            src={url}
+            controls
+            class="max-w-sm w-full max-h-72 rounded-lg mt-1 block"
+            preload="metadata"
+        ></video>
+    {:else if inlineMediaType === "audio"}
+        <!-- svelte-ignore a11y_media_has_caption -->
+        <audio src={url} controls class="w-full mt-1"></audio>
+    {/if}
 {:else if directEmbed?.type === "youtube"}
     <iframe
         src={directEmbed.embedUrl}

@@ -40,7 +40,7 @@
     let revealedSections = $state(new Set<string>());
 
     $effect(() => {
-        if (!mobileState.isMobile) searchEl?.focus();
+        if (!mobileState.isTouchscreen) searchEl?.focus();
     });
 
     // Scroll the tab bar so the active tab button is visible
@@ -329,14 +329,16 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-    class="{mobileState.isMobile
+    class="{mobileState.isTouchscreen
         ? 'w-full rounded-t-xl'
         : 'w-72 rounded-xl'} bg-discord-backgroundSecondary border border-discord-divider shadow-2xl flex flex-col"
-    style={mobileState.isMobile ? "max-height: 50dvh;" : "max-height: 380px;"}
+    style={mobileState.isTouchscreen
+        ? "max-height: 50dvh;"
+        : "max-height: 380px;"}
     onkeydown={onKeydown}
     onwheel={(e) => e.stopPropagation()}
 >
-    {#if mobileState.isMobile && (onSwitchToSticker || onSwitchToGif)}
+    {#if mobileState.isTouchscreen && (onSwitchToSticker || onSwitchToGif)}
         <div class="flex border-b border-discord-divider flex-shrink-0">
             <button
                 class="flex-1 py-2 text-sm font-semibold text-discord-textPrimary border-b-2 border-discord-accent"
