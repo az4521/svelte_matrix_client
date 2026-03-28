@@ -1,15 +1,15 @@
 import twemoji from "@twemoji/api";
 
 export const TWEMOJI_BASE =
-	"https://cdn.jsdelivr.net/gh/jdecked/twemoji@314c9f493f5609ab3a2691fba9650827c3e317a1/assets/";
+    "https://cdn.jsdelivr.net/gh/jdecked/twemoji@314c9f493f5609ab3a2691fba9650827c3e317a1/assets/";
 
 function fallback(emoji: string, className: string): string {
-	try {
-		const cp = twemoji.convert.toCodePoint(emoji);
-		return `<img src="${TWEMOJI_BASE}svg/${cp}.svg" alt="${emoji}" class="${className}" draggable="false" />`;
-	} catch {
-		return emoji;
-	}
+    try {
+        const cp = twemoji.convert.toCodePoint(emoji);
+        return `<img src="${TWEMOJI_BASE}svg/${cp}.svg" alt="${emoji}" class="${className}" draggable="false" />`;
+    } catch {
+        return emoji;
+    }
 }
 
 /**
@@ -17,13 +17,13 @@ function fallback(emoji: string, className: string): string {
  * Falls back to manual URL construction for emoji newer than the npm package.
  */
 export function renderEmoji(emoji: string, className: string): string {
-	const result = twemoji.parse(emoji, {
-		folder: "svg",
-		ext: ".svg",
-		base: TWEMOJI_BASE,
-		className,
-	}) as string;
-	return result.includes("<img") ? result : fallback(emoji, className);
+    const result = twemoji.parse(emoji, {
+        folder: "svg",
+        ext: ".svg",
+        base: TWEMOJI_BASE,
+        className,
+    }) as string;
+    return result.includes("<img") ? result : fallback(emoji, className);
 }
 
 /**
@@ -31,19 +31,19 @@ export function renderEmoji(emoji: string, className: string): string {
  * Does a second pass on text nodes to catch emoji newer than the npm package.
  */
 export function renderHtml(html: string, className: string): string {
-	const result = twemoji.parse(html, {
-		folder: "svg",
-		ext: ".svg",
-		base: TWEMOJI_BASE,
-		className,
-	}) as string;
+    const result = twemoji.parse(html, {
+        folder: "svg",
+        ext: ".svg",
+        base: TWEMOJI_BASE,
+        className,
+    }) as string;
 
-	// Second pass: only process text between tags (avoids mangling alt attributes)
-	return result.replace(/>([^<]+)</g, (_match, text: string) => {
-		const processed = text.replace(
-			/\p{Extended_Pictographic}(\u200D\p{Extended_Pictographic})*/gu,
-			(e) => fallback(e, className),
-		);
-		return `>${processed}<`;
-	});
+    // Second pass: only process text between tags (avoids mangling alt attributes)
+    return result.replace(/>([^<]+)</g, (_match, text: string) => {
+        const processed = text.replace(
+            /\p{Extended_Pictographic}(\u200D\p{Extended_Pictographic})*/gu,
+            (e) => fallback(e, className),
+        );
+        return `>${processed}<`;
+    });
 }

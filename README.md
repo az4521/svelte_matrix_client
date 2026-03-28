@@ -8,7 +8,7 @@ Messaging
 
 - Message search
 - Threads/replies as collapsible threads
-- Voice messages (m.audio recording)
+- Sending voice messages (m.audio recording)
 - Notifications
 - Push notifications (via a push gateway/service worker)
 - Message forwarding

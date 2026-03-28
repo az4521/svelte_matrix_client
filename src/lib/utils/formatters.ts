@@ -2,89 +2,89 @@ import { formatDistanceToNow, format } from "date-fns";
 import { AVATAR_PALETTE } from "$lib/utils/colors";
 
 export function formatTime(timestamp: number): string {
-	return format(new Date(timestamp), "p");
+    return format(new Date(timestamp), "p");
 }
 
 export function formatDate(timestamp: number): string {
-	const today = new Date();
-	const messageDate = new Date(timestamp);
+    const today = new Date();
+    const messageDate = new Date(timestamp);
 
-	if (
-		today.getDate() === messageDate.getDate() &&
-		today.getMonth() === messageDate.getMonth() &&
-		today.getFullYear() === messageDate.getFullYear()
-	) {
-		return format(messageDate, "h:mm a");
-	}
+    if (
+        today.getDate() === messageDate.getDate() &&
+        today.getMonth() === messageDate.getMonth() &&
+        today.getFullYear() === messageDate.getFullYear()
+    ) {
+        return format(messageDate, "h:mm a");
+    }
 
-	return format(messageDate, "MMM d, yyyy");
+    return format(messageDate, "MMM d, yyyy");
 }
 
 export function formatRelativeTime(timestamp: number): string {
-	return formatDistanceToNow(timestamp, { addSuffix: true });
+    return formatDistanceToNow(timestamp, { addSuffix: true });
 }
 
 export function truncateMessage(
-	message: string,
-	maxLength: number = 100,
+    message: string,
+    maxLength: number = 100,
 ): string {
-	if (message.length <= maxLength) {
-		return message;
-	}
-	return message.slice(0, maxLength) + "...";
+    if (message.length <= maxLength) {
+        return message;
+    }
+    return message.slice(0, maxLength) + "...";
 }
 
 export function formatRoomName(roomId: string, roomName?: string): string {
-	if (roomName) {
-		return roomName;
-	}
+    if (roomName) {
+        return roomName;
+    }
 
-	// Try to extract a name from the room ID
-	const aliasMatch = roomId.match(/#([^:]+):/);
-	if (aliasMatch) {
-		return aliasMatch[1];
-	}
+    // Try to extract a name from the room ID
+    const aliasMatch = roomId.match(/#([^:]+):/);
+    if (aliasMatch) {
+        return aliasMatch[1];
+    }
 
-	return roomId.slice(0, 10) + "...";
+    return roomId.slice(0, 10) + "...";
 }
 
 export function getRoomIcon(roomId: string): string {
-	// Return a color based on room ID for consistent icons
-	let hash = 0;
-	for (let i = 0; i < roomId.length; i++) {
-		hash = roomId.charCodeAt(i) + ((hash << 5) - hash);
-	}
+    // Return a color based on room ID for consistent icons
+    let hash = 0;
+    for (let i = 0; i < roomId.length; i++) {
+        hash = roomId.charCodeAt(i) + ((hash << 5) - hash);
+    }
 
-	return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
+    return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
 }
 
 export function getInitials(name: string): string {
-	if (!name) {
-		return "?";
-	}
-	const words = name.trim().split(" ");
-	if (words.length === 1) {
-		return words[0].charAt(0).toUpperCase();
-	}
-	return (
-		words[0].charAt(0) + words[words.length - 1].charAt(0)
-	).toUpperCase();
+    if (!name) {
+        return "?";
+    }
+    const words = name.trim().split(" ");
+    if (words.length === 1) {
+        return words[0].charAt(0).toUpperCase();
+    }
+    return (
+        words[0].charAt(0) + words[words.length - 1].charAt(0)
+    ).toUpperCase();
 }
 
 export function sanitizeHtml(html: string): string {
-	// Basic sanitization - in production, use a proper library like DOMPurify
-	return html
-		.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
-		.replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, "")
-		.replace(/on\w+="[^"]*"/g, "");
+    // Basic sanitization - in production, use a proper library like DOMPurify
+    return html
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+        .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, "")
+        .replace(/on\w+="[^"]*"/g, "");
 }
 
 export function isUrl(text: string): boolean {
-	const urlRegex = /(?:(?:https?|ftp):\/\/)?[\w/\-?=%.]+\.[\w/\-?=%.]+/;
-	return urlRegex.test(text);
+    const urlRegex = /(?:(?:https?|ftp):\/\/)?[\w/\-?=%.]+\.[\w/\-?=%.]+/;
+    return urlRegex.test(text);
 }
 
 export function extractUrls(text: string): string[] {
-	const urlRegex = /(?:(?:https?|ftp):\/\/)?[\w/\-?=%.]+/g;
-	return text.match(urlRegex) || [];
+    const urlRegex = /(?:(?:https?|ftp):\/\/)?[\w/\-?=%.]+/g;
+    return text.match(urlRegex) || [];
 }
