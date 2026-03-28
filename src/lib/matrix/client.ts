@@ -629,7 +629,9 @@ export function getUnreadCount(room: Room): number {
 }
 
 export function getHighlightCount(room: Room): number {
-    return room.getUnreadNotificationCount(NotificationCountType.Highlight) ?? 0
+    return (
+        room.getUnreadNotificationCount(NotificationCountType.Highlight) ?? 0
+    );
 }
 
 const NOTIFICATION_EVENT_TYPES = [
@@ -673,7 +675,11 @@ export function getRoomUnreadInfo(room: Room): {
     if (!readUpToId) {
         const hasReceipt =
             !!room.getReadReceiptForUserId(userId) ||
-            !!room.getReadReceiptForUserId(userId, false, "m.read.private" as any);
+            !!room.getReadReceiptForUserId(
+                userId,
+                false,
+                "m.read.private" as any,
+            );
         if (hasReceipt) return { unread: false, highlight };
     }
 
@@ -737,7 +743,8 @@ export function onEditEvent(
 export function onAnyReceiptEvent(callback: () => void): () => void {
     if (!matrixClient) return () => {};
     matrixClient.on(RoomEvent.Receipt as never, callback as never);
-    return () => matrixClient?.off(RoomEvent.Receipt as never, callback as never);
+    return () =>
+        matrixClient?.off(RoomEvent.Receipt as never, callback as never);
 }
 
 export async function sendEdit(
