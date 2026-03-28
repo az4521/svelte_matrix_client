@@ -13,14 +13,21 @@
     } from "$lib/matrix/client";
     import { roomsState, setActiveSpace } from "$lib/stores/rooms.svelte";
 
-    function getSpaceNotifs(spaceId: string): { unread: boolean; highlight: boolean } {
+    function getSpaceNotifs(spaceId: string): {
+        unread: boolean;
+        highlight: boolean;
+    } {
         void roomsState.unreadTick;
         const rooms = getRoomsInSpace(spaceId);
         let unread = false;
         let highlight = false;
         for (const r of rooms) {
             const info = getRoomUnreadInfo(r);
-            if (info.highlight) { unread = true; highlight = true; break; }
+            if (info.highlight) {
+                unread = true;
+                highlight = true;
+                break;
+            }
             if (info.unread) unread = true;
         }
         return { unread, highlight };
@@ -33,7 +40,11 @@
         let highlight = false;
         for (const r of rooms) {
             const info = getRoomUnreadInfo(r);
-            if (info.highlight) { unread = true; highlight = true; break; }
+            if (info.highlight) {
+                unread = true;
+                highlight = true;
+                break;
+            }
             if (info.unread) unread = true;
         }
         return { unread, highlight };
@@ -657,7 +668,9 @@
                 ></div>
             {:else if n.unread}
                 <div
-                    class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 w-1 rounded-r-full pointer-events-none {n.highlight ? 'h-4 bg-discord-danger' : 'h-2 bg-white'}"
+                    class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 w-1 rounded-r-full pointer-events-none {n.highlight
+                        ? 'h-4 bg-discord-danger'
+                        : 'h-2 bg-white'}"
                 ></div>
             {/if}
         {/each}
@@ -723,7 +736,9 @@
                     ></div>
                 {:else if spaceNotifs.unread}
                     <div
-                        class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 w-1 rounded-r-full pointer-events-none {spaceNotifs.highlight ? 'h-4 bg-discord-danger' : 'h-2 bg-white'}"
+                        class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 w-1 rounded-r-full pointer-events-none {spaceNotifs.highlight
+                            ? 'h-4 bg-discord-danger'
+                            : 'h-2 bg-white'}"
                     ></div>
                 {:else}
                     <div
@@ -743,7 +758,10 @@
             {@const folderNotifs = item.spaces.reduce(
                 (acc, s) => {
                     const n = getSpaceNotifs(s.roomId);
-                    return { unread: acc.unread || n.unread, highlight: acc.highlight || n.highlight };
+                    return {
+                        unread: acc.unread || n.unread,
+                        highlight: acc.highlight || n.highlight,
+                    };
                 },
                 { unread: false, highlight: false },
             )}
@@ -821,7 +839,9 @@
                         ></div>
                     {:else if folderNotifs.unread && !isExpanded}
                         <div
-                            class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 w-1 rounded-r-full pointer-events-none {folderNotifs.highlight ? 'h-4 bg-discord-danger' : 'h-2 bg-white'}"
+                            class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 w-1 rounded-r-full pointer-events-none {folderNotifs.highlight
+                                ? 'h-4 bg-discord-danger'
+                                : 'h-2 bg-white'}"
                         ></div>
                     {:else if !isExpanded}
                         <div
@@ -893,7 +913,9 @@
                                     ></div>
                                 {:else if isn.unread}
                                     <div
-                                        class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 w-1 rounded-r-full pointer-events-none {isn.highlight ? 'h-3 bg-discord-danger' : 'h-1.5 bg-white'}"
+                                        class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 w-1 rounded-r-full pointer-events-none {isn.highlight
+                                            ? 'h-3 bg-discord-danger'
+                                            : 'h-1.5 bg-white'}"
                                     ></div>
                                 {:else}
                                     <div

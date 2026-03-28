@@ -289,11 +289,20 @@
                             ? "border-left: 3px solid var(--discord-accent); background: linear-gradient(to right, var(--discord-bg-selected) 85%, var(--discord-bg-secondary)); padding-left: calc(0.5rem - 3px);"
                             : "padding-left: 0.5rem;"}
                     >
-                        <div class="w-4 flex-shrink-0 flex items-center justify-center mr-1.5">
+                        <div
+                            class="w-4 flex-shrink-0 flex items-center justify-center mr-1.5"
+                        >
                             {#if unread && !isActive}
-                                <span class="w-2 h-2 rounded-full {highlight ? 'bg-discord-danger' : 'bg-white'} flex-shrink-0"></span>
+                                <span
+                                    class="w-2 h-2 rounded-full {highlight
+                                        ? 'bg-discord-danger'
+                                        : 'bg-white'} flex-shrink-0"
+                                ></span>
                             {:else}
-                                <span class="w-5 h-5 opacity-70 font-semibold flex items-center justify-center text-[0.8rem]">#</span>
+                                <span
+                                    class="w-5 h-5 opacity-70 font-semibold flex items-center justify-center text-[0.8rem]"
+                                    >#</span
+                                >
                             {/if}
                         </div>
                         <span class="flex-1 text-sm truncate"
@@ -303,7 +312,9 @@
                             <span
                                 class="flex-shrink-0 bg-discord-danger text-white text-xs font-bold rounded-full px-1.5 min-w-[1.2rem] text-center ml-1"
                             >
-                                {getHighlightCount(room) > 99 ? "99+" : getHighlightCount(room)}
+                                {getHighlightCount(room) > 99
+                                    ? "99+"
+                                    : getHighlightCount(room)}
                             </span>
                         {/if}
                     </button>
@@ -401,7 +412,11 @@
                                 size={32}
                             />
                             {#if unread && !isActive}
-                                <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-discord-backgroundSecondary {highlight ? 'bg-discord-danger' : 'bg-white'}"></span>
+                                <span
+                                    class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-discord-backgroundSecondary {highlight
+                                        ? 'bg-discord-danger'
+                                        : 'bg-white'}"
+                                ></span>
                             {/if}
                         </div>
                         <span class="flex-1 text-sm truncate"
@@ -411,7 +426,9 @@
                             <span
                                 class="flex-shrink-0 bg-discord-danger text-white text-xs font-bold rounded-full px-1.5 min-w-[1.2rem] text-center"
                             >
-                                {getHighlightCount(room) > 99 ? "99+" : getHighlightCount(room)}
+                                {getHighlightCount(room) > 99
+                                    ? "99+"
+                                    : getHighlightCount(room)}
                             </span>
                         {/if}
                     </button>

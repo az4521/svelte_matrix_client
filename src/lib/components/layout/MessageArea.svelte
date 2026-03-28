@@ -411,6 +411,11 @@
             } else {
                 scrollToBottom(true);
             }
+            // If the scroll area isn't tall enough to scroll, onScroll never fires,
+            // so markAsRead() is never called. Handle that here.
+            if (scrollEl && scrollEl.scrollHeight <= scrollEl.clientHeight) {
+                markAsRead();
+            }
             autoFillMessages();
         });
     });
@@ -496,8 +501,8 @@
 
     function markAsRead() {
         const currentRoom = room;
-        const last = getLatestTimelineEvent(currentRoom)
-        console.log(last)
+        const last = getLatestTimelineEvent(currentRoom);
+        console.log(last);
         sendReadReceipt(last).catch(() => {});
         bumpUnreadTick();
         unreadMarkerEventId = null;

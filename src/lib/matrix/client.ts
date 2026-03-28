@@ -628,13 +628,16 @@ export function getUnreadCount(room: Room): number {
 }
 
 export function getHighlightCount(room: Room): number {
-    return room.getUnreadNotificationCount(NotificationCountType.Highlight) ?? 0;
+    return (
+        room.getUnreadNotificationCount(NotificationCountType.Highlight) ?? 0
+    );
 }
 
 /** Returns whether the room has any unread messages and whether any are highlights (mentions). */
-export function getRoomUnreadInfo(
-    room: Room,
-): { unread: boolean; highlight: boolean } {
+export function getRoomUnreadInfo(room: Room): {
+    unread: boolean;
+    highlight: boolean;
+} {
     const highlight = getHighlightCount(room) > 0;
     if (getUnreadCount(room) > 0) return { unread: true, highlight };
 
@@ -650,7 +653,8 @@ export function getRoomUnreadInfo(
         const has = events.some(
             (e) =>
                 e.getSender() !== userId &&
-                (e.getType() === "m.room.message" || e.getType() === "m.sticker"),
+                (e.getType() === "m.room.message" ||
+                    e.getType() === "m.sticker"),
         );
         return { unread: has, highlight };
     }
