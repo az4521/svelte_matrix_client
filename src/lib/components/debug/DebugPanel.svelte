@@ -1,6 +1,6 @@
 <script lang="ts">
     import type { Room, MatrixEvent } from "matrix-js-sdk";
-    import { getClient, getRawUrlPreview } from "$lib/matrix/client";
+    import { getClient, getRawUrlPreview, getRoomUnreadInfo } from "$lib/matrix/client";
     import { getMessages } from "$lib/stores/messages.svelte";
     import { tick } from "svelte";
 
@@ -77,6 +77,36 @@
         if (!body) return JSON.stringify(content).slice(0, 80);
         return body.slice(0, 60) + (body.length > 60 ? "…" : "");
     }
+
+    const NOTIFICATION_EVENT_TYPES = ["m.room.message", "m.room.encrypted", "m.sticker"];
+
+    const receiptsDebug = $derived.by(() => {
+        refreshTick;
+        const events = room.getLiveTimeline().getEvents();
+        // Collect all events that have at least one receipt
+        return events
+            .map((e) => ({ event: e, receipts: room.getReceiptsForEvent(e) }))
+            .filter(({ receipts }) => receipts.length > 0);
+    });
+
+    const unreadDebug = $derived.by(() => {
+        refreshTick;
+        const mx = getClient();
+        const userId = mx?.getUserId() ?? null;
+        const unreadInfo = getRoomUnreadInfo(room);
+        const readUpToId = userId ? room.getEventReadUpTo(userId) : null;
+        const events = room.getLiveTimeline().getEvents();
+        const lastEvent = events[events.length - 1];
+        const readIdx = readUpToId
+            ? events.findLastIndex((e) => e.getId() === readUpToId)
+            : -2;
+        const notifEventsAfterRead = readIdx >= 0
+            ? events.slice(readIdx + 1).filter(
+                (e) => NOTIFICATION_EVENT_TYPES.includes(e.getType()) && !e.isRedacted() && e.getRelation()?.rel_type !== "m.replace"
+              )
+            : [];
+        return { unreadInfo, readUpToId, readIdx, lastEvent, userId, totalEvents: events.length, notifEventsAfterRead };
+    });
 
     let previewUrl = $state("");
     let previewResult = $state<Record<string, unknown> | null>(null);
@@ -173,6 +203,87 @@
             </div>
 
             <div class="flex-1 overflow-y-auto font-mono text-xs">
+                <!-- Unread state -->
+                <section>
+                    <div class="sticky top-0 px-3 py-1 bg-[#1a1a0d] border-b border-[#333] text-yellow-300 font-bold">
+                        UNREAD STATE
+                    </div>
+                    <div class="px-3 py-2 flex flex-col gap-1">
+                        <div>
+                            <span class="text-gray-500">unread: </span>
+                            <span class:text-red-400={unreadDebug.unreadInfo.unread} class:text-green-400={!unreadDebug.unreadInfo.unread}>
+                                {unreadDebug.unreadInfo.unread}
+                            </span>
+                            <span class="text-gray-500 ml-3">highlight: </span>
+                            <span class:text-red-400={unreadDebug.unreadInfo.highlight} class:text-green-400={!unreadDebug.unreadInfo.highlight}>
+                                {unreadDebug.unreadInfo.highlight}
+                            </span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">userId: </span>
+                            <span class="text-purple-300">{unreadDebug.userId ?? "none"}</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">readUpToId: </span>
+                            <span class="text-blue-300 break-all">{unreadDebug.readUpToId ?? "none"}</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">readIdx in timeline: </span>
+                            <span class:text-red-400={unreadDebug.readIdx === -1} class:text-green-400={unreadDebug.readIdx >= 0}>
+                                {unreadDebug.readIdx === -2 ? "no receipt" : unreadDebug.readIdx === -1 ? "-1 (not in window!)" : unreadDebug.readIdx}
+                            </span>
+                            <span class="text-gray-500"> / {unreadDebug.totalEvents} events</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">last event sender: </span>
+                            <span class="text-purple-300">{unreadDebug.lastEvent?.getSender() ?? "none"}</span>
+                            <span class="text-gray-500 ml-2">(me: </span>
+                            <span class="text-purple-300">{unreadDebug.userId}</span>
+                            <span class="text-gray-500">)</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">notification events after read marker: </span>
+                            <span class:text-red-400={unreadDebug.notifEventsAfterRead.length > 0} class:text-green-400={unreadDebug.notifEventsAfterRead.length === 0}>
+                                {unreadDebug.notifEventsAfterRead.length}
+                            </span>
+                        </div>
+                        {#each unreadDebug.notifEventsAfterRead as e}
+                            <div class="pl-4 text-[11px] text-orange-300">
+                                [{formatTs(e.getTs())}] {e.getType()} from {e.getSender()?.split(":")[0]} — {msgPreview(e.getContent())}
+                            </div>
+                            <div class="pl-4 text-[10px] text-gray-600 break-all">{e.getId()}</div>
+                        {/each}
+                    </div>
+                </section>
+
+                <!-- Read receipts -->
+                <section>
+                    <div class="sticky top-0 px-3 py-1 bg-[#0d1a1a] border-b border-[#333] text-cyan-300 font-bold">
+                        READ RECEIPTS ({receiptsDebug.length} events with receipts)
+                    </div>
+                    {#each receiptsDebug as { event, receipts }}
+                        <div class="px-3 py-1 border-b border-[#1a1a1a]">
+                            <div class="text-gray-400 text-[11px] truncate">
+                                <span class="text-yellow-300">{formatTs(event.getTs())}</span>
+                                <span class="text-blue-300 ml-2">{event.getType()}</span>
+                                <span class="text-gray-600 ml-2 break-all">{event.getId()}</span>
+                            </div>
+                            {#each receipts as r}
+                                <div class="pl-4 text-[11px] flex gap-2">
+                                    <span class="text-purple-300">{r.userId}</span>
+                                    <span class="text-gray-500">{r.type}</span>
+                                    {#if r.data?.ts}
+                                        <span class="text-gray-600">{formatTs(r.data.ts)}</span>
+                                    {/if}
+                                </div>
+                            {/each}
+                        </div>
+                    {/each}
+                    {#if receiptsDebug.length === 0}
+                        <div class="px-3 py-2 text-gray-600 italic">no receipts</div>
+                    {/if}
+                </section>
+
                 <!-- URL Preview Inspector -->
                 <section>
                     <div

@@ -29,6 +29,7 @@
         onRoomUpdate,
         onAccountData,
         onTimelineEvent,
+        onAnyReceiptEvent,
     } from "$lib/matrix/client";
     import type { Room } from "matrix-js-sdk";
 
@@ -220,6 +221,7 @@
 
         const unsubRooms = onRoomUpdate(() => scheduleRefreshRooms());
         const unsubTimeline = onTimelineEvent(() => bumpUnreadTick());
+        const unsubReceipts = onAnyReceiptEvent(() => bumpUnreadTick());
         const unsubFavourites = initFavourites();
         const unsubAccountData = onAccountData((type) => {
             if (
@@ -231,6 +233,7 @@
         return () => {
             unsubRooms();
             unsubTimeline();
+            unsubReceipts();
             unsubFavourites();
             unsubAccountData();
             mq.removeEventListener("change", onMqChange);

@@ -312,9 +312,7 @@
                             <span
                                 class="flex-shrink-0 bg-discord-danger text-white text-xs font-bold rounded-full px-1.5 min-w-[1.2rem] text-center ml-1"
                             >
-                                {getHighlightCount(room) > 99
-                                    ? "99+"
-                                    : getHighlightCount(room)}
+                                {highlight > 99 ? "99+" : highlight}
                             </span>
                         {/if}
                     </button>
@@ -426,9 +424,7 @@
                             <span
                                 class="flex-shrink-0 bg-discord-danger text-white text-xs font-bold rounded-full px-1.5 min-w-[1.2rem] text-center"
                             >
-                                {getHighlightCount(room) > 99
-                                    ? "99+"
-                                    : getHighlightCount(room)}
+                                {highlight > 99 ? "99+" : highlight}
                             </span>
                         {/if}
                     </button>

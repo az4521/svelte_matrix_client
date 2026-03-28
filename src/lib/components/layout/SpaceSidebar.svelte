@@ -7,27 +7,35 @@
         setSpaceLayout,
         getRoomUnreadInfo,
         getRoomsInSpace,
+        getSpaceChildIds,
+        getRoom,
         getOrphanRooms,
         getDirectRooms,
         type SpaceLayout,
     } from "$lib/matrix/client";
     import { roomsState, setActiveSpace } from "$lib/stores/rooms.svelte";
 
-    function getSpaceNotifs(spaceId: string): {
-        unread: boolean;
-        highlight: boolean;
-    } {
+    function getSpaceNotifs(
+        spaceId: string,
+        visited = new Set<string>(),
+    ): { unread: boolean; highlight: boolean } {
         void roomsState.unreadTick;
+        if (visited.has(spaceId)) return { unread: false, highlight: false };
+        visited.add(spaceId);
         const rooms = getRoomsInSpace(spaceId);
         let unread = false;
         let highlight = false;
         for (const r of rooms) {
             const info = getRoomUnreadInfo(r);
-            if (info.highlight) {
-                unread = true;
-                highlight = true;
-                break;
-            }
+            if (info.highlight) return { unread: true, highlight: true };
+            if (info.unread) unread = true;
+        }
+        // Also check sub-spaces
+        for (const childId of getSpaceChildIds(spaceId)) {
+            const child = getRoom(childId);
+            if (!child?.isSpaceRoom()) continue;
+            const info = getSpaceNotifs(childId, visited);
+            if (info.highlight) return { unread: true, highlight: true };
             if (info.unread) unread = true;
         }
         return { unread, highlight };

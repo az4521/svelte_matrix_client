@@ -502,7 +502,6 @@
     function markAsRead() {
         const currentRoom = room;
         const last = getLatestTimelineEvent(currentRoom);
-        console.log(last);
         sendReadReceipt(last).catch(() => {});
         bumpUnreadTick();
         unreadMarkerEventId = null;

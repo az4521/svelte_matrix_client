@@ -64,6 +64,7 @@ export async function login(
         accessToken: response.access_token,
         userId: response.user_id,
         deviceId: response.device_id,
+        timelineSupport: true,
     });
 
     return {
@@ -628,47 +629,59 @@ export function getUnreadCount(room: Room): number {
 }
 
 export function getHighlightCount(room: Room): number {
-    return (
-        room.getUnreadNotificationCount(NotificationCountType.Highlight) ?? 0
-    );
+    return room.getUnreadNotificationCount(NotificationCountType.Highlight) ?? 0
+}
+
+const NOTIFICATION_EVENT_TYPES = [
+    "m.room.message",
+    "m.room.encrypted",
+    "m.sticker",
+];
+
+function isNotificationEvent(event: MatrixEvent): boolean {
+    if (!NOTIFICATION_EVENT_TYPES.includes(event.getType())) return false;
+    if (event.isRedacted()) return false;
+    if (event.getRelation()?.rel_type === "m.replace") return false;
+    return true;
 }
 
 /** Returns whether the room has any unread messages and whether any are highlights (mentions). */
 export function getRoomUnreadInfo(room: Room): {
     unread: boolean;
-    highlight: boolean;
+    highlight: number;
 } {
-    const highlight = getHighlightCount(room) > 0;
-    if (getUnreadCount(room) > 0) return { unread: true, highlight };
-
-    // Fallback: walk the live timeline for messages after the user's read receipt
+    const highlight = getHighlightCount(room);
     const userId = matrixClient?.getUserId();
     if (!userId) return { unread: false, highlight };
-    const readUpTo = room.getEventReadUpTo(userId);
-    const events = room.getLiveTimeline().getEvents();
-    if (events.length === 0) return { unread: false, highlight };
 
-    if (!readUpTo) {
-        // No receipt yet — any message from someone else counts
-        const has = events.some(
-            (e) =>
-                e.getSender() !== userId &&
-                (e.getType() === "m.room.message" ||
-                    e.getType() === "m.sticker"),
-        );
-        return { unread: has, highlight };
+    if (getUnreadCount(room) >= 1) return { unread: true, highlight };
+
+    const liveEvents = room.getLiveTimeline().getEvents();
+
+    // If the last event was sent by us, we're up to date
+    if (liveEvents[liveEvents.length - 1]?.getSender() === userId) {
+        return { unread: false, highlight };
     }
 
-    // Scan backwards; stop when we hit the read marker
-    for (let i = events.length - 1; i >= 0; i--) {
-        if (events[i].getId() === readUpTo) break;
-        const t = events[i].getType();
-        if (
-            (t === "m.room.message" || t === "m.sticker") &&
-            events[i].getSender() !== userId
-        ) {
-            return { unread: true, highlight };
-        }
+    const readUpToId = room.getEventReadUpTo(userId);
+
+    // getEventReadUpTo returns null if the receipt points at an event not in
+    // the loaded timeline window (SDK rejects it via receiptPointsAtConsistentEvent).
+    // In that case, check if a raw receipt exists at all — if yes, the marker
+    // is older than our loaded window, meaning all visible events are already
+    // read.
+    if (!readUpToId) {
+        const hasReceipt =
+            !!room.getReadReceiptForUserId(userId) ||
+            !!room.getReadReceiptForUserId(userId, false, "m.read.private" as any);
+        if (hasReceipt) return { unread: false, highlight };
+    }
+
+    for (let i = liveEvents.length - 1; i >= 0; i--) {
+        const event = liveEvents[i];
+        if (!event) return { unread: false, highlight };
+        if (event.getId() === readUpToId) return { unread: false, highlight };
+        if (isNotificationEvent(event)) return { unread: true, highlight };
     }
     return { unread: false, highlight };
 }
@@ -719,6 +732,12 @@ export function onEditEvent(
     };
     matrixClient.on(RoomEvent.Timeline, handler as never);
     return () => matrixClient?.off(RoomEvent.Timeline, handler as never);
+}
+
+export function onAnyReceiptEvent(callback: () => void): () => void {
+    if (!matrixClient) return () => {};
+    matrixClient.on(RoomEvent.Receipt as never, callback as never);
+    return () => matrixClient?.off(RoomEvent.Receipt as never, callback as never);
 }
 
 export async function sendEdit(
@@ -836,6 +855,7 @@ export async function loadContextAroundEvent(
 export async function sendReadReceipt(event: MatrixEvent): Promise<void> {
     if (!matrixClient) return;
     await matrixClient.sendReadReceipt(event);
+    await matrixClient.setRoomReadMarkers(event.getRoomId()!, event.getId()!);
 }
 
 /** Returns the event ID the current user has read up to in this room, or null. */
