@@ -237,7 +237,7 @@
                 }}
                 class="mb-2 w-full flex items-center gap-2 pr-2 py-1.5 transition-colors text-left"
                 class:text-discord-textPrimary={roomsState.showInbox}
-                class:text-discord-textMuted={!roomsState.showInbox}
+                class:text-discord-textSecondary={!roomsState.showInbox}
                 class:hover:bg-discord-messageHover={!roomsState.showInbox}
                 class:hover:text-discord-textPrimary={!roomsState.showInbox}
                 style={roomsState.showInbox
@@ -281,7 +281,7 @@
                         ontouchend={onRoomTouchEnd}
                         class="w-full flex items-center pr-2 py-1.5 transition-colors text-left"
                         class:text-discord-textPrimary={isActive || unread}
-                        class:text-discord-textMuted={!isActive && !unread}
+                        class:text-discord-textSecondary={!isActive && !unread}
                         class:font-semibold={unread}
                         class:hover:bg-discord-messageHover={!isActive}
                         class:hover:text-discord-textPrimary={!isActive}
@@ -335,14 +335,14 @@
                     >
                         <!-- Channel icon -->
                         <span
-                            class="w-5 h-5 flex-shrink-0 text-discord-textMuted opacity-50 font-semibold flex items-center justify-center"
+                            class="w-5 h-5 flex-shrink-0 text-discord-textSecondary opacity-50 font-semibold flex items-center justify-center"
                             >#</span
                         >
 
                         <!-- Name + member count -->
                         <div class="flex-1 min-w-0">
                             <p
-                                class="text-sm text-discord-textMuted group-hover:text-discord-textPrimary truncate transition-colors"
+                                class="text-sm text-discord-textSecondary group-hover:text-discord-textPrimary truncate transition-colors"
                             >
                                 {room.name}
                             </p>
@@ -395,7 +395,7 @@
                         ontouchend={onRoomTouchEnd}
                         class="w-full flex items-center gap-2 pr-2 py-1.5 transition-colors text-left"
                         class:text-discord-textPrimary={isActive || unread}
-                        class:text-discord-textMuted={!isActive && !unread}
+                        class:text-discord-textSecondary={!isActive && !unread}
                         class:font-semibold={unread}
                         class:hover:bg-discord-messageHover={!isActive}
                         class:hover:text-discord-textPrimary={!isActive}
@@ -453,7 +453,7 @@
             <p class="text-sm font-semibold text-discord-textPrimary truncate">
                 {auth.userId?.split(":")[0].replace("@", "") ?? "Unknown"}
             </p>
-            <p class="text-xs text-discord-textMuted truncate">
+            <p class="text-xs text-discord-textSecondary truncate">
                 {auth.userId ?? ""}
             </p>
         </div>
