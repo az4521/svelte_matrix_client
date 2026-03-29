@@ -8,9 +8,12 @@
         sendSticker,
         sendFile,
         getMemberName,
+        getMemberAvatar,
+        getRoomMembers,
         getCustomEmojis,
         sendTyping,
         onTypingEvent,
+        getOwnUserId,
         type CustomEmoji,
         type CustomSticker,
     } from "$lib/matrix/client";
@@ -57,6 +60,64 @@
     let typingUsers = $state<string[]>([]);
     let typingStopTimer: ReturnType<typeof setTimeout> | null = null;
     let lastTypingSentAt = 0;
+
+    // Mention autocomplete
+    let mentionQuery = $state<string | null>(null); // null = picker closed
+    let mentionStart = $state(0); // index of the @ in `text`
+    let mentionSelectedIdx = $state(0);
+    // Map of displayName → userId for mentions inserted in the current message
+    let pendingMentions = $state(new Map<string, string>());
+
+    const mentionCandidates = $derived.by(() => {
+        if (mentionQuery === null || !room) return [];
+        const q = mentionQuery.toLowerCase();
+        const ownId = getOwnUserId();
+        return getRoomMembers(room)
+            .filter((m) => m.userId !== ownId)
+            .filter(
+                (m) =>
+                    m.userId.toLowerCase().includes(q) ||
+                    (m.rawDisplayName ?? "").toLowerCase().includes(q),
+            )
+            .slice(0, 8);
+    });
+
+    $effect(() => {
+        // Clamp selection when candidate list changes
+        if (mentionSelectedIdx >= mentionCandidates.length)
+            mentionSelectedIdx = 0;
+    });
+
+    function detectMentionQuery() {
+        if (!textareaEl) return;
+        const pos = textareaEl.selectionStart ?? 0;
+        const before = text.slice(0, pos);
+        const match = before.match(/@(\S*)$/);
+        if (match) {
+            mentionQuery = match[1];
+            mentionStart = pos - match[0].length;
+        } else {
+            mentionQuery = null;
+        }
+    }
+
+    function commitMention(member: { userId: string; rawDisplayName?: string }) {
+        const displayName = member.rawDisplayName || member.userId;
+        const after = text.slice(mentionStart + 1 + (mentionQuery?.length ?? 0));
+        const before = text.slice(0, mentionStart);
+        // Insert pill: display name + trailing space
+        text = before + "@" + displayName + " " + after.replace(/^\S*/, "");
+        // Record so buildFormattedBody can emit the proper HTML link
+        pendingMentions = new Map([...pendingMentions, [displayName, member.userId]]);
+        mentionQuery = null;
+        tick().then(() => {
+            if (!textareaEl) return;
+            const newPos = mentionStart + 1 + displayName.length + 1;
+            textareaEl.selectionStart = newPos;
+            textareaEl.selectionEnd = newPos;
+            textareaEl.focus();
+        });
+    }
 
     // Subscribe to typing events for the current room
     $effect(() => {
@@ -153,7 +214,10 @@
         }
     });
 
-    function buildFormattedBody(plain: string): string | null {
+    function buildFormattedBody(plain: string): {
+        html: string | null;
+        mentionedUserIds: string[];
+    } {
         // Apply markdown formatting
         const { formattedBody, hasFormatting } = parseMarkdown(plain);
         let html = formattedBody;
@@ -176,7 +240,23 @@
             }
         }
 
-        return changed ? html : null;
+        // Replace @DisplayName tokens with Matrix mention links
+        const mentionedUserIds: string[] = [];
+        for (const [displayName, userId] of pendingMentions) {
+            const escaped = displayName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const re = new RegExp(`@${escaped}`, "g");
+            if (re.test(plain)) {
+                const link = `<a href="https://matrix.to/#/${userId}">@${displayName}</a>`;
+                html = html.replace(
+                    new RegExp(`@${escaped}`, "g"),
+                    link,
+                );
+                mentionedUserIds.push(userId);
+                changed = true;
+            }
+        }
+
+        return { html: changed ? html : null, mentionedUserIds };
     }
 
     async function send() {
@@ -194,32 +274,31 @@
         const filesToSend = fileQueue.slice();
         try {
             if (trimmed) {
+                const { html, mentionedUserIds } = buildFormattedBody(trimmed);
+                const mentions = mentionedUserIds.length > 0
+                    ? { user_ids: mentionedUserIds }
+                    : undefined;
                 if (replyToEvent) {
-                    const formattedBody = buildFormattedBody(trimmed);
                     await sendReply(
                         roomId,
                         trimmed,
                         replyToEvent,
-                        formattedBody ?? undefined,
+                        html ?? undefined,
+                        mentions,
                     );
                     onCancelReply?.();
+                } else if (html) {
+                    await sendFormattedMessage(roomId, trimmed, html, mentions);
                 } else {
-                    const formattedBody = buildFormattedBody(trimmed);
-                    if (formattedBody) {
-                        await sendFormattedMessage(
-                            roomId,
-                            trimmed,
-                            formattedBody,
-                        );
-                    } else {
-                        await sendTextMessage(roomId, trimmed);
-                    }
+                    await sendTextMessage(roomId, trimmed);
                 }
             }
             for (const item of filesToSend) {
                 await sendFile(roomId, item.file);
             }
             text = "";
+            mentionQuery = null;
+            pendingMentions = new Map();
             if (textareaEl) textareaEl.style.height = "auto";
             // Revoke object URLs and clear queue
             for (const item of filesToSend) {
@@ -248,6 +327,34 @@
                 behavior: "smooth",
             });
         }
+
+        // Mention picker navigation
+        if (mentionQuery !== null && mentionCandidates.length > 0) {
+            if (e.key === "ArrowUp") {
+                e.preventDefault();
+                mentionSelectedIdx =
+                    (mentionSelectedIdx - 1 + mentionCandidates.length) %
+                    mentionCandidates.length;
+                return;
+            }
+            if (e.key === "ArrowDown") {
+                e.preventDefault();
+                mentionSelectedIdx =
+                    (mentionSelectedIdx + 1) % mentionCandidates.length;
+                return;
+            }
+            if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
+                e.preventDefault();
+                const member = mentionCandidates[mentionSelectedIdx];
+                if (member) commitMention(member);
+                return;
+            }
+            if (e.key === "Escape") {
+                mentionQuery = null;
+                return;
+            }
+        }
+
         if (e.key === "Enter" && !e.shiftKey && !mobileState.isTouchscreen) {
             e.preventDefault();
             send();
@@ -355,6 +462,7 @@
         if (!textareaEl) return;
         textareaEl.style.height = "auto";
         textareaEl.style.height = Math.min(textareaEl.scrollHeight, 200) + "px";
+        detectMentionQuery();
 
         if (room) {
             const now = Date.now();
@@ -483,6 +591,38 @@
             {/each}
         </div>
     {/if}
+    <!-- Mention autocomplete picker -->
+    {#if mentionQuery !== null && mentionCandidates.length > 0}
+        <div class="mb-1 bg-discord-backgroundSecondary border border-discord-divider rounded-lg overflow-hidden shadow-lg">
+            {#each mentionCandidates as member, i}
+                <button
+                    onpointerdown={(e) => { e.preventDefault(); commitMention(member); }}
+                    class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left transition-colors"
+                    class:bg-discord-messageHover={i === mentionSelectedIdx}
+                    onpointerenter={() => (mentionSelectedIdx = i)}
+                >
+                    {#if getMemberAvatar(room!, member.userId)}
+                        <img
+                            src={getMemberAvatar(room!, member.userId)!}
+                            alt=""
+                            class="w-6 h-6 rounded-full object-cover flex-shrink-0"
+                        />
+                    {:else}
+                        <div class="w-6 h-6 rounded-full bg-discord-accent flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                            {(member.rawDisplayName || member.userId)[0]?.toUpperCase()}
+                        </div>
+                    {/if}
+                    <span class="text-sm text-discord-textPrimary font-medium truncate">
+                        {member.rawDisplayName || member.userId}
+                    </span>
+                    <span class="text-xs text-discord-textMuted truncate">
+                        {member.userId}
+                    </span>
+                </button>
+            {/each}
+        </div>
+    {/if}
+
     <div
         class="input-box flex items-center gap-2 bg-discord-backgroundSecondary rounded-lg px-2.5 py-2.5 border border-transparent transition-colors"
         class:rounded-tl-none={!!replyToEvent}
@@ -505,6 +645,7 @@
             onkeydown={onKeydown}
             oninput={onInput}
             onpaste={onPaste}
+            onclick={detectMentionQuery}
             placeholder={disabled
                 ? "Select a room to start chatting"
                 : replyToEvent

@@ -432,6 +432,7 @@ export async function sendFormattedMessage(
     roomId: string,
     body: string,
     formattedBody: string,
+    mentions?: { user_ids?: string[]; room?: boolean },
 ): Promise<void> {
     if (!matrixClient) throw new Error("Not logged in");
     await matrixClient.sendMessage(roomId, {
@@ -439,6 +440,7 @@ export async function sendFormattedMessage(
         body,
         format: "org.matrix.custom.html",
         formatted_body: formattedBody,
+        ...(mentions ? { "m.mentions": mentions } : {}),
     } as never);
 }
 
@@ -1810,6 +1812,7 @@ export async function sendReply(
     text: string,
     replyToEvent: MatrixEvent,
     formattedText?: string,
+    mentions?: { user_ids?: string[]; room?: boolean },
 ): Promise<void> {
     if (!matrixClient) throw new Error("Not logged in");
 
@@ -1841,5 +1844,6 @@ export async function sendReply(
         "m.relates_to": {
             "m.in_reply_to": { event_id: replyEventId },
         },
+        ...(mentions ? { "m.mentions": mentions } : {}),
     } as never);
 }

@@ -30,6 +30,8 @@
         onAccountData,
         onTimelineEvent,
         onAnyReceiptEvent,
+        getClient,
+        getOwnUserId,
     } from "$lib/matrix/client";
     import type { Room } from "matrix-js-sdk";
 
@@ -219,8 +221,19 @@
         pq.addEventListener("change", onPqHqChange);
         hq.addEventListener("change", onPqHqChange);
 
+        const pingAudio = new Audio("/sounds/ping.mp3");
+
         const unsubRooms = onRoomUpdate(() => scheduleRefreshRooms());
-        const unsubTimeline = onTimelineEvent(() => bumpUnreadTick());
+        const unsubTimeline = onTimelineEvent((event) => {
+            bumpUnreadTick();
+            if (event.getSender() !== getOwnUserId()) {
+                const actions = getClient()?.getPushActionsForEvent(event);
+                if (actions?.notify) {
+                    pingAudio.currentTime = 0;
+                    pingAudio.play().catch(() => {});
+                }
+            }
+        });
         const unsubReceipts = onAnyReceiptEvent(() => bumpUnreadTick());
         const unsubFavourites = initFavourites();
         const unsubAccountData = onAccountData((type) => {

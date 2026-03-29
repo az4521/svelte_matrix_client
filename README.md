@@ -9,7 +9,6 @@ Messaging
 - Message search
 - Threads/replies as collapsible threads
 - Sending voice messages (m.audio recording)
-- Notifications
 - Push notifications (via a push gateway/service worker)
 - Message forwarding
 - Polls (m.poll / MSC3381)
