@@ -18,6 +18,7 @@
         type CustomSticker,
     } from "$lib/matrix/client";
     import { parseMarkdown } from "$lib/utils/markdown";
+    import { ALL_EMOJIS } from "$lib/data/emojis";
     import EmojiPicker from "$lib/components/ui/EmojiPicker.svelte";
     import StickerPicker from "$lib/components/ui/StickerPicker.svelte";
     import GifPicker from "$lib/components/ui/GifPicker.svelte";
@@ -117,6 +118,74 @@
             textareaEl.selectionEnd = newPos;
             textareaEl.focus();
         });
+    }
+
+    // Emoji autocomplete
+    type EmojiCandidate =
+        | { kind: "unicode"; emoji: string; name: string }
+        | { kind: "custom"; shortcode: string; url: string };
+
+    let emojiQuery = $state<string | null>(null);
+    let emojiStart = $state(0);
+    let emojiSelectedIdx = $state(0);
+
+    const emojiCandidates = $derived.by((): EmojiCandidate[] => {
+        if (emojiQuery === null || emojiQuery.length < 2) return [];
+        const q = emojiQuery.toLowerCase();
+        const custom = getCustomEmojis(room, roomsState.activeSpaceId)
+            .filter((e) => e.shortcode.toLowerCase().includes(q))
+            .slice(0, 5)
+            .map((e): EmojiCandidate => ({ kind: "custom", shortcode: e.shortcode, url: e.url }));
+        const unicode = ALL_EMOJIS
+            .filter((e) => e.name.toLowerCase().includes(q))
+            .slice(0, 8 - custom.length)
+            .map((e): EmojiCandidate => ({ kind: "unicode", emoji: e.emoji, name: e.name }));
+        return [...custom, ...unicode];
+    });
+
+    $effect(() => {
+        if (emojiSelectedIdx >= emojiCandidates.length) emojiSelectedIdx = 0;
+    });
+
+    function detectEmojiQuery() {
+        if (!textareaEl) return;
+        const pos = textareaEl.selectionStart ?? 0;
+        const before = text.slice(0, pos);
+        // Match :word with no closing colon yet (at least 1 char after :)
+        const match = before.match(/:(\w+)$/);
+        if (match) {
+            emojiQuery = match[1];
+            emojiStart = pos - match[0].length;
+        } else {
+            emojiQuery = null;
+        }
+    }
+
+    function commitEmoji(candidate: EmojiCandidate) {
+        const queryLen = emojiQuery?.length ?? 0;
+        const before = text.slice(0, emojiStart);
+        const after = text.slice(emojiStart + 1 + queryLen);
+        if (candidate.kind === "unicode") {
+            text = before + candidate.emoji + " " + after.replace(/^\S*/, "");
+            const newPos = emojiStart + candidate.emoji.length + 1;
+            tick().then(() => {
+                if (!textareaEl) return;
+                textareaEl.selectionStart = newPos;
+                textareaEl.selectionEnd = newPos;
+                textareaEl.focus();
+            });
+        } else {
+            const insertion = `:${candidate.shortcode}: `;
+            text = before + insertion + after.replace(/^\S*/, "");
+            const newPos = emojiStart + insertion.length;
+            tick().then(() => {
+                if (!textareaEl) return;
+                textareaEl.selectionStart = newPos;
+                textareaEl.selectionEnd = newPos;
+                textareaEl.focus();
+            });
+        }
+        emojiQuery = null;
     }
 
     // Subscribe to typing events for the current room
@@ -298,6 +367,7 @@
             }
             text = "";
             mentionQuery = null;
+            emojiQuery = null;
             pendingMentions = new Map();
             if (textareaEl) textareaEl.style.height = "auto";
             // Revoke object URLs and clear queue
@@ -351,6 +421,33 @@
             }
             if (e.key === "Escape") {
                 mentionQuery = null;
+                return;
+            }
+        }
+
+        // Emoji picker navigation
+        if (emojiQuery !== null && emojiCandidates.length > 0) {
+            if (e.key === "ArrowUp") {
+                e.preventDefault();
+                emojiSelectedIdx =
+                    (emojiSelectedIdx - 1 + emojiCandidates.length) %
+                    emojiCandidates.length;
+                return;
+            }
+            if (e.key === "ArrowDown") {
+                e.preventDefault();
+                emojiSelectedIdx =
+                    (emojiSelectedIdx + 1) % emojiCandidates.length;
+                return;
+            }
+            if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
+                e.preventDefault();
+                const candidate = emojiCandidates[emojiSelectedIdx];
+                if (candidate) commitEmoji(candidate);
+                return;
+            }
+            if (e.key === "Escape") {
+                emojiQuery = null;
                 return;
             }
         }
@@ -463,6 +560,7 @@
         textareaEl.style.height = "auto";
         textareaEl.style.height = Math.min(textareaEl.scrollHeight, 200) + "px";
         detectMentionQuery();
+        detectEmojiQuery();
 
         if (room) {
             const now = Date.now();
@@ -591,6 +689,30 @@
             {/each}
         </div>
     {/if}
+    <!-- Emoji autocomplete picker -->
+    {#if emojiQuery !== null && emojiCandidates.length > 0}
+        <div class="mb-1 bg-discord-backgroundSecondary border border-discord-divider rounded-lg overflow-hidden shadow-lg">
+            {#each emojiCandidates as candidate, i}
+                <button
+                    onpointerdown={(e) => { e.preventDefault(); commitEmoji(candidate); }}
+                    onpointerenter={() => (emojiSelectedIdx = i)}
+                    class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left transition-colors"
+                    class:bg-discord-messageHover={i === emojiSelectedIdx}
+                >
+                    {#if candidate.kind === "unicode"}
+                        <span class="text-xl w-6 text-center flex-shrink-0">{candidate.emoji}</span>
+                        <span class="text-sm text-discord-textPrimary truncate">:{candidate.name.replace(/ /g, "_")}:</span>
+                        <span class="text-xs text-discord-textMuted">{candidate.emoji}</span>
+                    {:else}
+                        <img src={candidate.url} alt={candidate.shortcode} class="w-6 h-6 object-contain flex-shrink-0" />
+                        <span class="text-sm text-discord-textPrimary truncate">:{candidate.shortcode}:</span>
+                        <span class="text-xs text-discord-textMuted">custom</span>
+                    {/if}
+                </button>
+            {/each}
+        </div>
+    {/if}
+
     <!-- Mention autocomplete picker -->
     {#if mentionQuery !== null && mentionCandidates.length > 0}
         <div class="mb-1 bg-discord-backgroundSecondary border border-discord-divider rounded-lg overflow-hidden shadow-lg">
@@ -645,7 +767,7 @@
             onkeydown={onKeydown}
             oninput={onInput}
             onpaste={onPaste}
-            onclick={detectMentionQuery}
+            onclick={() => { detectMentionQuery(); detectEmojiQuery(); }}
             placeholder={disabled
                 ? "Select a room to start chatting"
                 : replyToEvent
