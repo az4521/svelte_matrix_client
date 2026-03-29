@@ -102,14 +102,22 @@
         }
     }
 
-    function commitMention(member: { userId: string; rawDisplayName?: string }) {
+    function commitMention(member: {
+        userId: string;
+        rawDisplayName?: string;
+    }) {
         const displayName = member.rawDisplayName || member.userId;
-        const after = text.slice(mentionStart + 1 + (mentionQuery?.length ?? 0));
+        const after = text.slice(
+            mentionStart + 1 + (mentionQuery?.length ?? 0),
+        );
         const before = text.slice(0, mentionStart);
         // Insert pill: display name + trailing space
         text = before + "@" + displayName + " " + after.replace(/^\S*/, "");
         // Record so buildFormattedBody can emit the proper HTML link
-        pendingMentions = new Map([...pendingMentions, [displayName, member.userId]]);
+        pendingMentions = new Map([
+            ...pendingMentions,
+            [displayName, member.userId],
+        ]);
         mentionQuery = null;
         tick().then(() => {
             if (!textareaEl) return;
@@ -135,11 +143,24 @@
         const custom = getCustomEmojis(room, roomsState.activeSpaceId)
             .filter((e) => e.shortcode.toLowerCase().includes(q))
             .slice(0, 5)
-            .map((e): EmojiCandidate => ({ kind: "custom", shortcode: e.shortcode, url: e.url }));
-        const unicode = ALL_EMOJIS
-            .filter((e) => e.name.toLowerCase().includes(q))
+            .map(
+                (e): EmojiCandidate => ({
+                    kind: "custom",
+                    shortcode: e.shortcode,
+                    url: e.url,
+                }),
+            );
+        const unicode = ALL_EMOJIS.filter((e) =>
+            e.name.toLowerCase().includes(q),
+        )
             .slice(0, 8 - custom.length)
-            .map((e): EmojiCandidate => ({ kind: "unicode", emoji: e.emoji, name: e.name }));
+            .map(
+                (e): EmojiCandidate => ({
+                    kind: "unicode",
+                    emoji: e.emoji,
+                    name: e.name,
+                }),
+            );
         return [...custom, ...unicode];
     });
 
@@ -316,10 +337,7 @@
             const re = new RegExp(`@${escaped}`, "g");
             if (re.test(plain)) {
                 const link = `<a href="https://matrix.to/#/${userId}">@${displayName}</a>`;
-                html = html.replace(
-                    new RegExp(`@${escaped}`, "g"),
-                    link,
-                );
+                html = html.replace(new RegExp(`@${escaped}`, "g"), link);
                 mentionedUserIds.push(userId);
                 changed = true;
             }
@@ -344,9 +362,10 @@
         try {
             if (trimmed) {
                 const { html, mentionedUserIds } = buildFormattedBody(trimmed);
-                const mentions = mentionedUserIds.length > 0
-                    ? { user_ids: mentionedUserIds }
-                    : undefined;
+                const mentions =
+                    mentionedUserIds.length > 0
+                        ? { user_ids: mentionedUserIds }
+                        : undefined;
                 if (replyToEvent) {
                     await sendReply(
                         roomId,
@@ -691,22 +710,41 @@
     {/if}
     <!-- Emoji autocomplete picker -->
     {#if emojiQuery !== null && emojiCandidates.length > 0}
-        <div class="mb-1 bg-discord-backgroundSecondary border border-discord-divider rounded-lg overflow-hidden shadow-lg">
+        <div
+            class="mb-1 bg-discord-backgroundSecondary border border-discord-divider rounded-lg overflow-hidden shadow-lg"
+        >
             {#each emojiCandidates as candidate, i}
                 <button
-                    onpointerdown={(e) => { e.preventDefault(); commitEmoji(candidate); }}
+                    onpointerdown={(e) => {
+                        e.preventDefault();
+                        commitEmoji(candidate);
+                    }}
                     onpointerenter={() => (emojiSelectedIdx = i)}
                     class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left transition-colors"
                     class:bg-discord-messageHover={i === emojiSelectedIdx}
                 >
                     {#if candidate.kind === "unicode"}
-                        <span class="text-xl w-6 text-center flex-shrink-0">{candidate.emoji}</span>
-                        <span class="text-sm text-discord-textPrimary truncate">:{candidate.name.replace(/ /g, "_")}:</span>
-                        <span class="text-xs text-discord-textMuted">{candidate.emoji}</span>
+                        <span class="text-xl w-6 text-center flex-shrink-0"
+                            >{candidate.emoji}</span
+                        >
+                        <span class="text-sm text-discord-textPrimary truncate"
+                            >:{candidate.name.replace(/ /g, "_")}:</span
+                        >
+                        <span class="text-xs text-discord-textMuted"
+                            >{candidate.emoji}</span
+                        >
                     {:else}
-                        <img src={candidate.url} alt={candidate.shortcode} class="w-6 h-6 object-contain flex-shrink-0" />
-                        <span class="text-sm text-discord-textPrimary truncate">:{candidate.shortcode}:</span>
-                        <span class="text-xs text-discord-textMuted">custom</span>
+                        <img
+                            src={candidate.url}
+                            alt={candidate.shortcode}
+                            class="w-6 h-6 object-contain flex-shrink-0"
+                        />
+                        <span class="text-sm text-discord-textPrimary truncate"
+                            >:{candidate.shortcode}:</span
+                        >
+                        <span class="text-xs text-discord-textMuted"
+                            >custom</span
+                        >
                     {/if}
                 </button>
             {/each}
@@ -715,10 +753,15 @@
 
     <!-- Mention autocomplete picker -->
     {#if mentionQuery !== null && mentionCandidates.length > 0}
-        <div class="mb-1 bg-discord-backgroundSecondary border border-discord-divider rounded-lg overflow-hidden shadow-lg">
+        <div
+            class="mb-1 bg-discord-backgroundSecondary border border-discord-divider rounded-lg overflow-hidden shadow-lg"
+        >
             {#each mentionCandidates as member, i}
                 <button
-                    onpointerdown={(e) => { e.preventDefault(); commitMention(member); }}
+                    onpointerdown={(e) => {
+                        e.preventDefault();
+                        commitMention(member);
+                    }}
                     class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left transition-colors"
                     class:bg-discord-messageHover={i === mentionSelectedIdx}
                     onpointerenter={() => (mentionSelectedIdx = i)}
@@ -730,11 +773,16 @@
                             class="w-6 h-6 rounded-full object-cover flex-shrink-0"
                         />
                     {:else}
-                        <div class="w-6 h-6 rounded-full bg-discord-accent flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                            {(member.rawDisplayName || member.userId)[0]?.toUpperCase()}
+                        <div
+                            class="w-6 h-6 rounded-full bg-discord-accent flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                        >
+                            {(member.rawDisplayName ||
+                                member.userId)[0]?.toUpperCase()}
                         </div>
                     {/if}
-                    <span class="text-sm text-discord-textPrimary font-medium truncate">
+                    <span
+                        class="text-sm text-discord-textPrimary font-medium truncate"
+                    >
                         {member.rawDisplayName || member.userId}
                     </span>
                     <span class="text-xs text-discord-textMuted truncate">
@@ -767,7 +815,10 @@
             onkeydown={onKeydown}
             oninput={onInput}
             onpaste={onPaste}
-            onclick={() => { detectMentionQuery(); detectEmojiQuery(); }}
+            onclick={() => {
+                detectMentionQuery();
+                detectEmojiQuery();
+            }}
             placeholder={disabled
                 ? "Select a room to start chatting"
                 : replyToEvent

@@ -92,7 +92,9 @@
         refreshTick;
         const mx = getClient();
         if (!mx) return null;
-        const rules = mx.getAccountData("m.push_rules")?.getContent<{ global: Record<string, any[]> }>();
+        const rules = mx
+            .getAccountData("m.push_rules")
+            ?.getContent<{ global: Record<string, any[]> }>();
         return rules?.global ?? null;
     });
 
@@ -337,28 +339,51 @@
 
                 <!-- Push rules -->
                 <section>
-                    <div class="sticky top-0 px-3 py-1 bg-[#0d1a0d] border-b border-[#333] text-green-300 font-bold">
+                    <div
+                        class="sticky top-0 px-3 py-1 bg-[#0d1a0d] border-b border-[#333] text-green-300 font-bold"
+                    >
                         PUSH RULES
                     </div>
                     {#if pushRulesDebug}
                         {#each Object.entries(pushRulesDebug) as [kind, rules]}
                             {#if rules.length > 0}
-                                <div class="px-3 pt-2 pb-1 text-[11px] text-gray-500 uppercase tracking-wide">{kind}</div>
+                                <div
+                                    class="px-3 pt-2 pb-1 text-[11px] text-gray-500 uppercase tracking-wide"
+                                >
+                                    {kind}
+                                </div>
                                 {#each rules as rule}
-                                    <div class="px-3 py-1 border-b border-[#1a1a1a] text-[11px]">
-                                        <div class="flex items-center gap-2 flex-wrap">
-                                            <span class:text-green-400={rule.enabled} class:text-red-400={!rule.enabled}>
+                                    <div
+                                        class="px-3 py-1 border-b border-[#1a1a1a] text-[11px]"
+                                    >
+                                        <div
+                                            class="flex items-center gap-2 flex-wrap"
+                                        >
+                                            <span
+                                                class:text-green-400={rule.enabled}
+                                                class:text-red-400={!rule.enabled}
+                                            >
                                                 {rule.enabled ? "●" : "○"}
                                             </span>
-                                            <span class="text-yellow-200 font-medium">{rule.rule_id}</span>
-                                            {#if rule.default}<span class="text-gray-600">(default)</span>{/if}
+                                            <span
+                                                class="text-yellow-200 font-medium"
+                                                >{rule.rule_id}</span
+                                            >
+                                            {#if rule.default}<span
+                                                    class="text-gray-600"
+                                                    >(default)</span
+                                                >{/if}
                                         </div>
                                         <div class="pl-4 text-gray-400">
-                                            actions: {JSON.stringify(rule.actions)}
+                                            actions: {JSON.stringify(
+                                                rule.actions,
+                                            )}
                                         </div>
                                         {#if rule.conditions}
                                             <div class="pl-4 text-gray-600">
-                                                conditions: {JSON.stringify(rule.conditions)}
+                                                conditions: {JSON.stringify(
+                                                    rule.conditions,
+                                                )}
                                             </div>
                                         {/if}
                                     </div>
@@ -366,7 +391,9 @@
                             {/if}
                         {/each}
                     {:else}
-                        <div class="px-3 py-2 text-gray-600 italic">no push rules found</div>
+                        <div class="px-3 py-2 text-gray-600 italic">
+                            no push rules found
+                        </div>
                     {/if}
                 </section>
 
