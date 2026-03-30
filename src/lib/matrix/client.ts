@@ -8,6 +8,9 @@ import {
     EventTimeline,
     MatrixEvent,
     NotificationCountType,
+    PushRuleKind,
+    PushRuleActionName,
+    RuleId,
 } from "matrix-js-sdk";
 import type { MatrixClient, Room, RoomMember } from "matrix-js-sdk";
 
@@ -740,6 +743,297 @@ export function onEditEvent(
     };
     matrixClient.on(RoomEvent.Timeline, handler as never);
     return () => matrixClient?.off(RoomEvent.Timeline, handler as never);
+}
+
+// ── Default push rule helpers ──────────────────────────────────────────────
+
+export interface DefaultPushRule {
+    ruleId: string;
+    kind: PushRuleKind;
+    label: string;
+    description: string;
+    /** Conditions for override/underride rules, or pattern for content rules. Used when creating server-side. */
+    conditions?: object[];
+    pattern?: string | "USERNAME_LOCALPART";
+}
+
+export type PushRuleLevel = "loud" | "silent" | "off";
+
+export const DEFAULT_PUSH_RULES: DefaultPushRule[] = [
+    {
+        ruleId: RuleId.DM,
+        kind: PushRuleKind.Underride,
+        label: "Direct messages",
+        description: "Messages in direct message rooms",
+        conditions: [
+            { kind: "room_member_count", is: "2" },
+            { kind: "event_match", key: "type", pattern: "m.room.message" },
+        ],
+    },
+    {
+        ruleId: RuleId.Message,
+        kind: PushRuleKind.Underride,
+        label: "Rooms",
+        description: "Messages in all other rooms",
+        conditions: [
+            { kind: "event_match", key: "type", pattern: "m.room.message" },
+        ],
+    },
+    {
+        ruleId: RuleId.IsUserMention,
+        kind: PushRuleKind.Override,
+        label: "Full Matrix ID mentions",
+        description: "Messages using your full @user:homeserver ID",
+        conditions: [{ kind: "is_user_mention" }],
+    },
+    {
+        ruleId: RuleId.ContainsDisplayName,
+        kind: PushRuleKind.Override,
+        label: "Display name mentions",
+        description: "Messages containing your display name",
+        conditions: [{ kind: "contains_display_name" }],
+    },
+    {
+        ruleId: RuleId.ContainsUserName,
+        kind: PushRuleKind.ContentSpecific,
+        label: "Username mentions",
+        description: "Messages containing your username (without server)",
+        pattern: "USERNAME_LOCALPART",
+    },
+    {
+        ruleId: RuleId.AtRoomNotification,
+        kind: PushRuleKind.Override,
+        label: "@room mentions",
+        description: "Messages using @room to notify everyone",
+        conditions: [
+            { kind: "event_match", key: "content.body", pattern: "@room" },
+        ],
+    },
+    {
+        ruleId: RuleId.InviteToSelf,
+        kind: PushRuleKind.Override,
+        label: "Invitations",
+        description: "When you are invited to a room",
+        conditions: [
+            { kind: "event_match", key: "type", pattern: "m.room.member" },
+            {
+                kind: "event_match",
+                key: "content.membership",
+                pattern: "invite",
+            },
+            { kind: "event_match", key: "state_key", pattern: "SELF_USER_ID" },
+        ],
+    },
+];
+
+function getGlobalPushRules(): Record<string, any[]> | undefined {
+    return (matrixClient as any)?.pushRules?.global as
+        | Record<string, any[]>
+        | undefined;
+}
+
+function findRule(ruleId: string): any | undefined {
+    const global = getGlobalPushRules();
+    if (!global) return undefined;
+    for (const kindRules of Object.values(global)) {
+        const rule = kindRules.find((r: any) => r.rule_id === ruleId);
+        if (rule) return rule;
+    }
+    return undefined;
+}
+
+/** Returns whether a rule's actions include a sound tweak. */
+function ruleHasSound(rule: any): boolean {
+    return (
+        (rule.actions as any[])?.some(
+            (a: any) => typeof a === "object" && a.set_tweak === "sound",
+        ) ?? false
+    );
+}
+
+export function getDefaultPushRuleLevel(ruleId: string): PushRuleLevel {
+    const rule = findRule(ruleId);
+    if (!rule || rule.enabled === false) return "off";
+    const notifies =
+        (rule.actions as any[])?.some(
+            (a: any) => a === PushRuleActionName.Notify || a === "notify",
+        ) ?? false;
+    if (!notifies) return "off";
+    return ruleHasSound(rule) ? "loud" : "silent";
+}
+
+export async function setDefaultPushRuleLevel(
+    ruleId: string,
+    kind: PushRuleKind,
+    level: PushRuleLevel,
+): Promise<void> {
+    if (!matrixClient) return;
+
+    // Server-default rules (dotted IDs) cannot be created — only enabled/actions updated.
+    // Custom rules that don't exist yet must be created with addPushRule.
+    const isServerDefault = ruleId.startsWith(".");
+
+    const createRule = async (actions: any[]) => {
+        const ruleDef = DEFAULT_PUSH_RULES.find((r) => r.ruleId === ruleId);
+        const userId = matrixClient!.getUserId() ?? "";
+        const localpart = userId.startsWith("@")
+            ? userId.slice(1).split(":")[0]
+            : userId;
+        const conditions = ruleDef?.conditions?.map((c: any) =>
+            c.pattern === "SELF_USER_ID" ? { ...c, pattern: userId } : c,
+        );
+        const pattern =
+            ruleDef?.pattern === "USERNAME_LOCALPART"
+                ? localpart
+                : ruleDef?.pattern;
+        await matrixClient!.addPushRule("global", kind, ruleId, {
+            actions,
+            conditions,
+            pattern,
+        });
+    };
+
+    if (level === "off") {
+        try {
+            await matrixClient.setPushRuleEnabled(
+                "global",
+                kind,
+                ruleId,
+                false,
+            );
+        } catch {
+            if (!isServerDefault) {
+                const silentActions = [
+                    PushRuleActionName.Notify,
+                    { set_tweak: "highlight", value: false },
+                ];
+                await createRule(silentActions);
+                await matrixClient.setPushRuleEnabled(
+                    "global",
+                    kind,
+                    ruleId,
+                    false,
+                );
+            }
+            // For server-default rules we fall through and update local state optimistically
+        }
+        const rule = findRule(ruleId);
+        if (rule) rule.enabled = false;
+    } else {
+        const actions: any[] =
+            level === "loud"
+                ? [
+                      PushRuleActionName.Notify,
+                      { set_tweak: "sound", value: "default" },
+                      { set_tweak: "highlight", value: false },
+                  ]
+                : [
+                      PushRuleActionName.Notify,
+                      { set_tweak: "highlight", value: false },
+                  ];
+        try {
+            await matrixClient.setPushRuleActions(
+                "global",
+                kind,
+                ruleId,
+                actions,
+            );
+            await matrixClient.setPushRuleEnabled("global", kind, ruleId, true);
+        } catch {
+            if (isServerDefault) {
+                // Can't create server-default rules — update local state optimistically only
+            } else {
+                await createRule(actions);
+            }
+        }
+        const rule = findRule(ruleId);
+        if (rule) {
+            rule.enabled = true;
+            rule.actions = actions;
+        }
+    }
+}
+
+// ── Per-room notification settings ────────────────────────────────────────
+
+export type RoomNotificationSetting = "default" | "all" | "mentions" | "mute";
+
+export function getRoomNotificationSetting(
+    roomId: string,
+): RoomNotificationSetting {
+    if (!matrixClient) return "default";
+    const global = getGlobalPushRules();
+    // Check override rules for a mute entry matching this room
+    const overrideRule = (global?.override ?? []).find(
+        (r: any) => r.rule_id === roomId,
+    );
+    if (
+        overrideRule &&
+        (overrideRule.actions.length === 0 ||
+            overrideRule.actions[0] === "dont_notify")
+    ) {
+        return "mute";
+    }
+    // Check room-specific rules for an "all messages" entry
+    const roomSpecificRule = (global?.room ?? []).find(
+        (r: any) => r.rule_id === roomId,
+    );
+    if (
+        roomSpecificRule &&
+        roomSpecificRule.actions[0] === PushRuleActionName.Notify
+    ) {
+        return "all";
+    }
+    return "default";
+}
+
+export async function setRoomNotificationSetting(
+    roomId: string,
+    setting: RoomNotificationSetting,
+): Promise<void> {
+    if (!matrixClient) return;
+    // Remove any existing room-specific or override rule first
+    try {
+        await matrixClient.deletePushRule(
+            "global",
+            PushRuleKind.RoomSpecific,
+            roomId,
+        );
+    } catch {
+        /* didn't exist */
+    }
+    try {
+        await matrixClient.deletePushRule(
+            "global",
+            PushRuleKind.Override,
+            roomId,
+        );
+    } catch {
+        /* didn't exist */
+    }
+    if (setting === "all") {
+        await matrixClient.addPushRule(
+            "global",
+            PushRuleKind.RoomSpecific,
+            roomId,
+            {
+                actions: [PushRuleActionName.Notify],
+            },
+        );
+    } else if (setting === "mute") {
+        await matrixClient.addPushRule(
+            "global",
+            PushRuleKind.Override,
+            roomId,
+            {
+                actions: [],
+                conditions: [
+                    { kind: "event_match", key: "room_id", pattern: roomId },
+                ],
+            },
+        );
+    }
+    // "mentions" = no rule = server default
 }
 
 export function onAnyReceiptEvent(callback: () => void): () => void {

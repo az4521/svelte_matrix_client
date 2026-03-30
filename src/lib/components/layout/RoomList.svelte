@@ -14,6 +14,9 @@
         getMyPowerLevel,
         getRoomPowerLevels,
         getRoom,
+        getRoomNotificationSetting,
+        setRoomNotificationSetting,
+        type RoomNotificationSetting,
     } from "$lib/matrix/client";
     import {
         roomsState,
@@ -75,6 +78,14 @@
             clearTimeout(ctxTouchTimer);
             ctxTouchTimer = null;
         }
+    }
+
+    async function handleSetNotification(
+        roomId: string,
+        setting: RoomNotificationSetting,
+    ) {
+        contextMenu = null;
+        await setRoomNotificationSetting(roomId, setting);
     }
 
     async function handleLeave(roomId: string) {
@@ -480,13 +491,34 @@
 </div>
 
 {#if contextMenu}
+    {@const currentSetting = getRoomNotificationSetting(contextMenu.roomId)}
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="fixed inset-0 z-50" onclick={() => (contextMenu = null)}></div>
     <div
-        class="fixed z-50 bg-discord-backgroundTertiary border border-discord-divider rounded-lg shadow-xl py-1 min-w-36"
+        class="fixed z-50 bg-discord-backgroundTertiary border border-discord-divider rounded-lg shadow-xl py-1 min-w-44"
         style="left: {contextMenu.x}px; top: {contextMenu.y}px"
     >
+        <p
+            class="px-3 py-1 text-xs text-discord-textMuted uppercase font-semibold tracking-wide"
+        >
+            Notifications
+        </p>
+        {#each [["default", "Default"], ["all", "All Messages"], ["mentions", "Mentions Only"], ["mute", "Mute"]] as const as [val, label]}
+            <button
+                onclick={() => handleSetNotification(contextMenu!.roomId, val)}
+                class="w-full text-left px-3 py-1.5 text-sm transition-colors flex items-center gap-2"
+                class:text-discord-textPrimary={currentSetting === val}
+                class:text-discord-textSecondary={currentSetting !== val}
+                class:hover:bg-discord-messageHover={true}
+            >
+                <span class="w-3 text-center text-xs"
+                    >{currentSetting === val ? "●" : ""}</span
+                >
+                {label}
+            </button>
+        {/each}
+        <div class="w-full h-px bg-discord-divider my-1"></div>
         <button
             onclick={() => handleLeave(contextMenu!.roomId)}
             class="w-full text-left px-3 py-1.5 text-sm text-discord-danger hover:bg-discord-danger hover:text-white transition-colors"

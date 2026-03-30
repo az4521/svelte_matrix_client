@@ -6,6 +6,7 @@
     import RoomList from "$lib/components/layout/RoomList.svelte";
     import MessageArea from "$lib/components/layout/MessageArea.svelte";
     import RoomSettings from "$lib/components/layout/RoomSettings.svelte";
+    import AppSettings from "$lib/components/layout/AppSettings.svelte";
     import InboxPanel from "$lib/components/layout/InboxPanel.svelte";
 
     import { auth, clearSession } from "$lib/stores/auth.svelte";
@@ -229,8 +230,13 @@
             if (event.getSender() !== getOwnUserId()) {
                 const actions = getClient()?.getPushActionsForEvent(event);
                 if (actions?.notify) {
-                    pingAudio.currentTime = 0;
-                    pingAudio.play().catch(() => {});
+                    const soundEnabled =
+                        localStorage.getItem("notifSoundEnabled") !== "false";
+                    const hasSound = (actions.tweaks as any)?.sound;
+                    if (soundEnabled && hasSound) {
+                        pingAudio.currentTime = 0;
+                        pingAudio.play().catch(() => {});
+                    }
                 }
             }
         });
@@ -423,69 +429,10 @@
 
         <!-- Settings overlay -->
         {#if showSettings}
-            <div
-                class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-                role="presentation"
-                onclick={(e) => {
-                    if (e.target === e.currentTarget) showSettings = false;
-                }}
-                onkeydown={(e) => {
-                    if (e.key === "Escape") showSettings = false;
-                }}
-            >
-                <div
-                    class="bg-discord-backgroundSecondary rounded-lg shadow-2xl p-6 w-96 max-w-full mx-4"
-                >
-                    <h2 class="text-xl font-bold text-discord-textPrimary mb-4">
-                        Settings
-                    </h2>
-                    <div class="space-y-3 text-sm">
-                        <div
-                            class="flex justify-between items-center py-2 border-b border-discord-divider"
-                        >
-                            <span class="text-discord-textMuted font-medium"
-                                >User ID</span
-                            >
-                            <span
-                                class="text-discord-textPrimary font-mono text-xs"
-                                >{auth.userId}</span
-                            >
-                        </div>
-                        <div
-                            class="flex justify-between items-center py-2 border-b border-discord-divider"
-                        >
-                            <span class="text-discord-textMuted font-medium"
-                                >Homeserver</span
-                            >
-                            <span class="text-discord-textPrimary text-xs"
-                                >{auth.homeserverUrl}</span
-                            >
-                        </div>
-                        <div
-                            class="flex justify-between items-center py-2 border-b border-discord-divider"
-                        >
-                            <span class="text-discord-textMuted font-medium"
-                                >Sync state</span
-                            >
-                            <span class="text-discord-textPrimary text-xs"
-                                >{auth.syncState}</span
-                            >
-                        </div>
-                    </div>
-                    <div class="mt-6 flex gap-3">
-                        <button
-                            onclick={handleLogout}
-                            class="flex-1 py-2 bg-discord-danger hover:bg-discord-danger/80 text-white rounded font-medium text-sm transition-colors"
-                            >Log Out</button
-                        >
-                        <button
-                            onclick={() => (showSettings = false)}
-                            class="flex-1 py-2 bg-discord-backgroundTertiary hover:bg-discord-messageHover text-discord-textPrimary rounded font-medium text-sm transition-colors"
-                            >Close</button
-                        >
-                    </div>
-                </div>
-            </div>
+            <AppSettings
+                onClose={() => (showSettings = false)}
+                onLogout={handleLogout}
+            />
         {/if}
     </div>
 {/if}

@@ -11,6 +11,9 @@
         getRoom,
         getOrphanRooms,
         getDirectRooms,
+        getRoomNotificationSetting,
+        setRoomNotificationSetting,
+        type RoomNotificationSetting,
         type SpaceLayout,
     } from "$lib/matrix/client";
     import { roomsState, setActiveSpace } from "$lib/stores/rooms.svelte";
@@ -442,6 +445,28 @@
     }
 
     // --- Actions ---
+
+    async function handleSetSpaceNotification(
+        spaceId: string,
+        setting: RoomNotificationSetting,
+    ) {
+        contextMenu = null;
+        // Apply to the space room itself and all its rooms recursively
+        const allRoomIds = [spaceId];
+        const collect = (id: string, visited = new Set<string>()) => {
+            if (visited.has(id)) return;
+            visited.add(id);
+            for (const r of getRoomsInSpace(id)) allRoomIds.push(r.roomId);
+            for (const childId of getSpaceChildIds(id)) {
+                const child = getRoom(childId);
+                if (child?.isSpaceRoom()) collect(childId, visited);
+            }
+        };
+        collect(spaceId);
+        await Promise.all(
+            allRoomIds.map((id) => setRoomNotificationSetting(id, setting)),
+        );
+    }
 
     async function handleLeaveSpace(spaceId: string) {
         contextMenu = null;
@@ -967,9 +992,28 @@
         >
             {#if contextMenu.kind === "space"}
                 {@const cm = contextMenu}
-                {@const folders = Object.entries(
-                    roomsState.spaceLayout.folders,
-                )}
+                {@const currentNotif = getRoomNotificationSetting(cm.spaceId)}
+                <p
+                    class="px-3 py-1 text-xs text-discord-textMuted uppercase font-semibold tracking-wide"
+                >
+                    Notifications
+                </p>
+                {#each [["default", "Default"], ["all", "All Messages"], ["mentions", "Mentions Only"], ["mute", "Mute"]] as const as [val, label]}
+                    <button
+                        onclick={() =>
+                            handleSetSpaceNotification(cm.spaceId, val)}
+                        class="w-full text-left px-3 py-1.5 text-sm transition-colors flex items-center gap-2"
+                        class:text-discord-textPrimary={currentNotif === val}
+                        class:text-discord-textSecondary={currentNotif !== val}
+                        class:hover:bg-discord-messageHover={true}
+                    >
+                        <span class="w-3 text-center text-xs"
+                            >{currentNotif === val ? "●" : ""}</span
+                        >
+                        {label}
+                    </button>
+                {/each}
+                <div class="w-full h-px bg-discord-divider my-1"></div>
                 {#if cm.folderId}
                     <button
                         onclick={() =>
@@ -984,23 +1028,7 @@
                         class="w-full text-left px-3 py-1.5 text-sm text-discord-textSecondary hover:bg-discord-messageHover hover:text-discord-textPrimary transition-colors"
                         >New Folder</button
                     >
-                    {#if folders.length > 0}
-                        <div class="w-full h-px bg-discord-divider my-1"></div>
-                        <p
-                            class="px-3 py-1 text-xs text-discord-textMuted uppercase font-semibold tracking-wide"
-                        >
-                            Move to folder
-                        </p>
-                        {#each folders as [folderId, folder]}
-                            <button
-                                onclick={() =>
-                                    handleMoveToFolder(cm.spaceId, folderId)}
-                                class="w-full text-left px-3 py-1.5 text-sm text-discord-textSecondary hover:bg-discord-messageHover hover:text-discord-textPrimary transition-colors truncate"
-                                >{folder.name}</button
-                            >
-                        {/each}
-                        <div class="w-full h-px bg-discord-divider my-1"></div>
-                    {/if}
+                    <div class="w-full h-px bg-discord-divider my-1"></div>
                 {/if}
                 <button
                     onclick={() => handleLeaveSpace(cm.spaceId)}
