@@ -14,6 +14,10 @@
         getMyPowerLevel,
         getRoomPowerLevels,
         getRoom,
+        getSpaces,
+        getRoomDisplayName as getSpaceName,
+        addRoomToSpace,
+        canAddRoomToSpace,
         getRoomNotificationSetting,
         setRoomNotificationSetting,
         type RoomNotificationSetting,
@@ -86,6 +90,11 @@
     ) {
         contextMenu = null;
         await setRoomNotificationSetting(roomId, setting);
+    }
+
+    async function handleAddToSpace(roomId: string, spaceId: string) {
+        contextMenu = null;
+        await addRoomToSpace(spaceId, roomId);
     }
 
     async function handleLeave(roomId: string) {
@@ -232,10 +241,8 @@
         {/if}
     </div>
 
-    <!-- Quick actions (Home view only) -->
-    {#if !roomsState.activeSpaceId}
-        <QuickActions />
-    {/if}
+    <!-- Quick actions -->
+    <QuickActions spaceId={roomsState.activeSpaceId ?? undefined} />
 
     <!-- Room list -->
     <div class="flex-1 overflow-y-auto">
@@ -496,7 +503,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="fixed inset-0 z-50" onclick={() => (contextMenu = null)}></div>
     <div
-        class="fixed z-50 bg-discord-backgroundTertiary border border-discord-divider rounded-lg shadow-xl py-1 min-w-44"
+        class="fixed z-50 bg-discord-backgroundTertiary border border-discord-divider rounded-lg shadow-xl py-1 min-w-44 max-w-52"
         style="left: {contextMenu.x}px; top: {contextMenu.y}px"
     >
         <p
@@ -518,6 +525,25 @@
                 {label}
             </button>
         {/each}
+        {#if getSpaces().filter((s) => canAddRoomToSpace(s.roomId)).length > 0}
+            {@const eligibleSpaces = getSpaces().filter((s) =>
+                canAddRoomToSpace(s.roomId),
+            )}
+            <div class="w-full h-px bg-discord-divider my-1"></div>
+            <p
+                class="px-3 py-1 text-xs text-discord-textMuted uppercase font-semibold tracking-wide"
+            >
+                Add to Space
+            </p>
+            {#each eligibleSpaces as space}
+                <button
+                    onclick={() =>
+                        handleAddToSpace(contextMenu!.roomId, space.roomId)}
+                    class="w-full text-left px-3 py-1.5 text-sm text-discord-textSecondary hover:bg-discord-messageHover hover:text-discord-textPrimary transition-colors truncate"
+                    >{getSpaceName(space)}</button
+                >
+            {/each}
+        {/if}
         <div class="w-full h-px bg-discord-divider my-1"></div>
         <button
             onclick={() => handleLeave(contextMenu!.roomId)}

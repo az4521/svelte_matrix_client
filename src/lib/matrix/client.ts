@@ -1405,7 +1405,11 @@ export async function joinRoomByAlias(alias: string): Promise<string> {
     return result.roomId;
 }
 
-export async function createRoom(name: string, topic: string): Promise<string> {
+export async function createRoom(
+    name: string,
+    topic: string,
+    spaceId?: string,
+): Promise<string> {
     if (!matrixClient) throw new Error("Not logged in");
     const result = await matrixClient.createRoom({
         name: name || undefined,
@@ -1413,9 +1417,53 @@ export async function createRoom(name: string, topic: string): Promise<string> {
         visibility: "private" as any,
         preset: "private_chat" as any,
     });
-    const room = matrixClient.getRoom(result.room_id);
+    const roomId = result.room_id;
+    if (spaceId) await addRoomToSpace(spaceId, roomId);
+    const room = matrixClient.getRoom(roomId);
     if (room) await matrixClient.scrollback(room, 30).catch(() => {});
+    return roomId;
+}
+
+export async function createSpace(
+    name: string,
+    topic: string,
+): Promise<string> {
+    if (!matrixClient) throw new Error("Not logged in");
+    const result = await matrixClient.createRoom({
+        name: name || undefined,
+        topic: topic || undefined,
+        visibility: "private" as any,
+        preset: "private_chat" as any,
+        creation_content: { type: "m.space" },
+        power_level_content_override: {
+            events: { "m.space.child": 0 },
+        },
+    });
     return result.room_id;
+}
+
+export function canAddRoomToSpace(spaceId: string): boolean {
+    const space = matrixClient?.getRoom(spaceId);
+    if (!space) return false;
+    const myLevel = getMyPowerLevel(space);
+    const pl = getRoomPowerLevels(space);
+    const required = pl.events["m.space.child"] ?? pl.state_default ?? 50;
+    return myLevel >= required;
+}
+
+export async function addRoomToSpace(
+    spaceId: string,
+    roomId: string,
+): Promise<void> {
+    if (!matrixClient) throw new Error("Not logged in");
+    const userId = matrixClient.getUserId() ?? "";
+    const serverName = userId.includes(":") ? userId.split(":")[1] : "";
+    await (matrixClient as any).sendStateEvent(
+        spaceId,
+        "m.space.child",
+        { via: serverName ? [serverName] : [] },
+        roomId,
+    );
 }
 
 export async function createDirectMessage(userId: string): Promise<string> {

@@ -3,6 +3,7 @@
     import Avatar from "$lib/components/ui/Avatar.svelte";
     import {
         getRoomAvatar,
+        getRoomDisplayName,
         leaveRoom,
         setSpaceLayout,
         getRoomUnreadInfo,
@@ -11,12 +12,19 @@
         getRoom,
         getOrphanRooms,
         getDirectRooms,
+        addRoomToSpace,
+        canAddRoomToSpace,
+        createRoom as createRoomFn,
         getRoomNotificationSetting,
         setRoomNotificationSetting,
         type RoomNotificationSetting,
         type SpaceLayout,
     } from "$lib/matrix/client";
-    import { roomsState, setActiveSpace } from "$lib/stores/rooms.svelte";
+    import {
+        roomsState,
+        setActiveSpace,
+        setActiveRoom,
+    } from "$lib/stores/rooms.svelte";
 
     function getSpaceNotifs(
         spaceId: string,
@@ -478,6 +486,60 @@
         }
     }
 
+    // ── Create room / Add room modals ─────────────────────────────────────────
+
+    let createRoomModal = $state<{ spaceId: string } | null>(null);
+    let addRoomModal = $state<{ spaceId: string } | null>(null);
+    let modalInput1 = $state("");
+    let modalInput2 = $state("");
+    let modalLoading = $state(false);
+    let modalError = $state("");
+
+    function openCreateRoom(spaceId: string) {
+        contextMenu = null;
+        modalInput1 = "";
+        modalInput2 = "";
+        modalError = "";
+        createRoomModal = { spaceId };
+    }
+
+    function openAddRoom(spaceId: string) {
+        contextMenu = null;
+        addRoomModal = { spaceId };
+    }
+
+    async function submitCreateRoom() {
+        if (!createRoomModal) return;
+        modalError = "";
+        modalLoading = true;
+        try {
+            const roomId = await createRoomFn(
+                modalInput1.trim(),
+                modalInput2.trim(),
+                createRoomModal.spaceId,
+            );
+            setActiveRoom(roomId);
+            createRoomModal = null;
+        } catch (e: any) {
+            modalError = e?.data?.error ?? e?.message ?? "Something went wrong";
+        } finally {
+            modalLoading = false;
+        }
+    }
+
+    async function submitAddRoom(roomId: string) {
+        if (!addRoomModal) return;
+        await addRoomToSpace(addRoomModal.spaceId, roomId);
+        addRoomModal = null;
+    }
+
+    function getRoomsNotInSpace(spaceId: string) {
+        const childIds = new Set(getSpaceChildIds(spaceId));
+        return [...getOrphanRooms(), ...getDirectRooms()].filter(
+            (r) => !childIds.has(r.roomId) && !r.isSpaceRoom(),
+        );
+    }
+
     function handleNewFolder(spaceId: string) {
         contextMenu = null;
         const layout = getLayout();
@@ -497,19 +559,6 @@
         layout.folders[folderId] = { name: "", spaceIds: [spaceId] };
         saveLayout(layout);
         expandedFolders = new Set([...expandedFolders, folderId]);
-    }
-
-    function handleMoveToFolder(spaceId: string, targetFolderId: string) {
-        contextMenu = null;
-        const layout = getLayout();
-        layout.order = layout.order.filter((id) => id !== spaceId);
-        for (const fid in layout.folders) {
-            layout.folders[fid].spaceIds = layout.folders[fid].spaceIds.filter(
-                (id) => id !== spaceId,
-            );
-        }
-        layout.folders[targetFolderId].spaceIds.push(spaceId);
-        saveLayout(layout);
     }
 
     function handleRemoveFromFolder(spaceId: string, folderId: string) {
@@ -1013,6 +1062,19 @@
                         {label}
                     </button>
                 {/each}
+                {#if canAddRoomToSpace(cm.spaceId)}
+                    <div class="w-full h-px bg-discord-divider my-1"></div>
+                    <button
+                        onclick={() => openCreateRoom(cm.spaceId)}
+                        class="w-full text-left px-3 py-1.5 text-sm text-discord-textSecondary hover:bg-discord-messageHover hover:text-discord-textPrimary transition-colors"
+                        >Create Room</button
+                    >
+                    <button
+                        onclick={() => openAddRoom(cm.spaceId)}
+                        class="w-full text-left px-3 py-1.5 text-sm text-discord-textSecondary hover:bg-discord-messageHover hover:text-discord-textPrimary transition-colors"
+                        >Add Existing Room</button
+                    >
+                {/if}
                 <div class="w-full h-px bg-discord-divider my-1"></div>
                 {#if cm.folderId}
                     <button
@@ -1193,6 +1255,135 @@
                     </svg>
                 </div>
             {/if}
+        </div>
+    {/if}
+
+    <!-- Create room in space modal -->
+    {#if createRoomModal}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+            onclick={() => (createRoomModal = null)}
+        >
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div
+                class="bg-discord-background rounded-lg shadow-xl w-full max-w-md mx-4 p-6 flex flex-col gap-4"
+                onclick={(e) => e.stopPropagation()}
+                onkeydown={(e) => {
+                    if (e.key === "Escape") createRoomModal = null;
+                    if (e.key === "Enter") submitCreateRoom();
+                }}
+            >
+                <h2 class="text-lg font-bold text-discord-textPrimary">
+                    Create room in space
+                </h2>
+                <div class="flex flex-col gap-3">
+                    <div>
+                        <!-- svelte-ignore a11y_label_has_associated_control -->
+                        <label
+                            class="block text-xs font-semibold text-discord-textMuted uppercase tracking-wide mb-1.5"
+                            >Room name</label
+                        >
+                        <input
+                            bind:value={modalInput1}
+                            placeholder="my-room"
+                            class="w-full px-3 py-2 bg-discord-backgroundSecondary text-discord-textPrimary placeholder-discord-textMuted rounded border border-discord-divider focus:border-discord-accent focus:outline-none text-sm"
+                        />
+                    </div>
+                    <div>
+                        <!-- svelte-ignore a11y_label_has_associated_control -->
+                        <label
+                            class="block text-xs font-semibold text-discord-textMuted uppercase tracking-wide mb-1.5"
+                            >Topic <span class="normal-case font-normal"
+                                >(optional)</span
+                            ></label
+                        >
+                        <input
+                            bind:value={modalInput2}
+                            placeholder="What's this room about?"
+                            class="w-full px-3 py-2 bg-discord-backgroundSecondary text-discord-textPrimary placeholder-discord-textMuted rounded border border-discord-divider focus:border-discord-accent focus:outline-none text-sm"
+                        />
+                    </div>
+                </div>
+                {#if modalError}<p class="text-sm text-discord-error">
+                        {modalError}
+                    </p>{/if}
+                <div class="flex justify-end gap-2 mt-1">
+                    <button
+                        onclick={() => (createRoomModal = null)}
+                        disabled={modalLoading}
+                        class="px-4 py-2 rounded text-sm font-medium text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors disabled:opacity-50"
+                        >Cancel</button
+                    >
+                    <button
+                        onclick={submitCreateRoom}
+                        disabled={modalLoading || !modalInput1.trim()}
+                        class="px-4 py-2 rounded text-sm font-semibold bg-discord-accent hover:bg-discord-accentHover text-white transition-colors disabled:opacity-50 flex items-center gap-2"
+                    >
+                        {#if modalLoading}<div
+                                class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"
+                            ></div>{/if}
+                        Create
+                    </button>
+                </div>
+            </div>
+        </div>
+    {/if}
+
+    <!-- Add existing room to space modal -->
+    {#if addRoomModal}
+        {@const candidates = getRoomsNotInSpace(addRoomModal.spaceId)}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+            onclick={() => (addRoomModal = null)}
+        >
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div
+                class="bg-discord-background rounded-lg shadow-xl w-full max-w-md mx-4 p-6 flex flex-col gap-4"
+                onclick={(e) => e.stopPropagation()}
+                onkeydown={(e) => {
+                    if (e.key === "Escape") addRoomModal = null;
+                }}
+            >
+                <h2 class="text-lg font-bold text-discord-textPrimary">
+                    Add existing room to space
+                </h2>
+                {#if candidates.length === 0}
+                    <p class="text-sm text-discord-textMuted">
+                        No rooms available to add.
+                    </p>
+                {:else}
+                    <div class="flex flex-col gap-1 max-h-72 overflow-y-auto">
+                        {#each candidates as room}
+                            <button
+                                onclick={() => submitAddRoom(room.roomId)}
+                                class="w-full text-left px-3 py-2 rounded text-sm text-discord-textSecondary hover:bg-discord-messageHover hover:text-discord-textPrimary transition-colors flex items-center gap-2"
+                            >
+                                <Avatar
+                                    src={getRoomAvatar(room)}
+                                    name={getRoomDisplayName(room)}
+                                    size={24}
+                                    rounded="none"
+                                    class="rounded flex-shrink-0"
+                                />
+                                <span class="truncate"
+                                    >{getRoomDisplayName(room)}</span
+                                >
+                            </button>
+                        {/each}
+                    </div>
+                {/if}
+                <div class="flex justify-end">
+                    <button
+                        onclick={() => (addRoomModal = null)}
+                        class="px-4 py-2 rounded text-sm font-medium text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors"
+                        >Cancel</button
+                    >
+                </div>
+            </div>
         </div>
     {/if}
 

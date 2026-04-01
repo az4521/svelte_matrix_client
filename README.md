@@ -15,11 +15,9 @@ Messaging
 
 Rooms
 
-- Creating rooms within spaces and spaces
 - Initiating room upgrades
 - Room directory / public room search
 - Knock to join (requesting access to invite-only rooms)
-- Per-room notification settings (all messages, mentions only, muted)
 - Notification badge on browser tab (favicon)
 - Moderation (kick/ban/deleting messages)
 - Nested spaces
@@ -32,7 +30,7 @@ User
 - Presence (online/away/offline status)
 - Ignore/block users
 - SSO / OAuth login
-- Device/session management
+- Device / session management
 - Account settings (password change, deactivation)
 
 Encryption
@@ -43,7 +41,7 @@ Encryption
 
 Media
 
-- Audio/video calling (WebRTC)
+- Audio / video calling (WebRTC)
 - Better URL previews (Blocked by Tuwunel)
 
 feel free to try it out :) i host a copy at https://matrix.crafty.moe/

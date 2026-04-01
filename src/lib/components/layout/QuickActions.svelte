@@ -1,16 +1,24 @@
 <script lang="ts">
     import {
         createRoom,
+        createSpace,
         createDirectMessage,
         joinRoomByAlias,
+        canAddRoomToSpace,
     } from "$lib/matrix/client";
     import { setActiveRoom } from "$lib/stores/rooms.svelte";
 
-    type Mode = "create-room" | "create-dm" | "join-room";
+    type Mode = "create-room" | "create-space" | "create-dm" | "join-room";
+
+    interface Props {
+        /** If set, new rooms are created inside this space */
+        spaceId?: string;
+    }
+    let { spaceId }: Props = $props();
 
     let mode = $state<Mode | null>(null);
-    let input1 = $state(""); // room name / user id / room address
-    let input2 = $state(""); // room topic
+    let input1 = $state(""); // room name / space name / user id / room address
+    let input2 = $state(""); // room topic / space topic
     let loading = $state(false);
     let error = $state("");
 
@@ -32,7 +40,13 @@
         try {
             let roomId: string;
             if (mode === "create-room") {
-                roomId = await createRoom(input1.trim(), input2.trim());
+                roomId = await createRoom(
+                    input1.trim(),
+                    input2.trim(),
+                    spaceId,
+                );
+            } else if (mode === "create-space") {
+                roomId = await createSpace(input1.trim(), input2.trim());
             } else if (mode === "create-dm") {
                 const userId = input1.trim();
                 if (!userId.startsWith("@") || !userId.includes(":")) {
@@ -70,51 +84,78 @@
 
 <!-- Action buttons -->
 <div class="flex flex-col">
-    <button
-        onclick={() => open("create-dm")}
-        class="w-full flex items-center gap-2 pr-2 py-1.5 text-left text-sm text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors"
-        style="padding-left: 0.5rem;"
-    >
-        <svg
-            class="w-4 h-4 flex-shrink-0 opacity-70"
-            fill="currentColor"
-            viewBox="0 0 24 24"
-            ><path
-                d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"
-            /></svg
+    {#if !spaceId}
+        <button
+            onclick={() => open("create-dm")}
+            class="w-full flex items-center gap-2 pr-2 py-1.5 text-left text-sm text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors"
+            style="padding-left: 0.5rem;"
         >
-        <span class="flex-1 truncate">New DM</span>
-    </button>
-    <button
-        onclick={() => open("create-room")}
-        class="w-full flex items-center gap-2 pr-2 py-1.5 text-left text-sm text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors"
-        style="padding-left: 0.5rem;"
-    >
-        <svg
-            class="w-4 h-4 flex-shrink-0 opacity-70"
-            fill="currentColor"
-            viewBox="0 0 24 24"
-            ><path
-                d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"
-            /></svg
+            <svg
+                class="w-4 h-4 flex-shrink-0 opacity-70"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+            >
+                <path
+                    d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"
+                />
+            </svg>
+            <span class="flex-1 truncate">New DM</span>
+        </button>
+    {/if}
+    {#if !spaceId || canAddRoomToSpace(spaceId)}
+        <button
+            onclick={() => open("create-room")}
+            class="w-full flex items-center gap-2 pr-2 py-1.5 text-left text-sm text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors"
+            style="padding-left: 0.5rem;"
         >
-        <span class="flex-1 truncate">Create new room</span>
-    </button>
-    <button
-        onclick={() => open("join-room")}
-        class="w-full flex items-center gap-2 pr-2 py-1.5 text-left text-sm text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors"
-        style="padding-left: 0.5rem;"
-    >
-        <svg
-            class="w-4 h-4 flex-shrink-0 opacity-70"
-            fill="currentColor"
-            viewBox="0 0 24 24"
-            ><path
-                d="M11 7 9.6 8.4l2.6 2.6H2v2h10.2l-2.6 2.6L11 17l5-5-5-5zm9 12h-8v2h8c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-8v2h8v14z"
-            /></svg
+            <svg
+                class="w-4 h-4 flex-shrink-0 opacity-70"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+            >
+                <path
+                    d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"
+                />
+            </svg>
+            <span class="flex-1 truncate"
+                >{spaceId ? "Create room in space" : "Create new room"}</span
+            >
+        </button>
+    {/if}
+    {#if !spaceId}
+        <button
+            onclick={() => open("create-space")}
+            class="w-full flex items-center gap-2 pr-2 py-1.5 text-left text-sm text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors"
+            style="padding-left: 0.5rem;"
         >
-        <span class="flex-1 truncate">Join room by address</span>
-    </button>
+            <svg
+                class="w-4 h-4 flex-shrink-0 opacity-70"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+            >
+                <path
+                    d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"
+                />
+            </svg>
+            <span class="flex-1 truncate">Create new space</span>
+        </button>
+        <button
+            onclick={() => open("join-room")}
+            class="w-full flex items-center gap-2 pr-2 py-1.5 text-left text-sm text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors"
+            style="padding-left: 0.5rem;"
+        >
+            <svg
+                class="w-4 h-4 flex-shrink-0 opacity-70"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+            >
+                <path
+                    d="M11 7 9.6 8.4l2.6 2.6H2v2h10.2l-2.6 2.6L11 17l5-5-5-5zm9 12h-8v2h8c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-8v2h8v14z"
+                />
+            </svg>
+            <span class="flex-1 truncate">Join room by address</span>
+        </button>
+    {/if}
 </div>
 
 <!-- Modal -->
@@ -132,23 +173,31 @@
             onkeydown={onKeydown}
         >
             <h2 class="text-lg font-bold text-discord-textPrimary">
-                {#if mode === "create-room"}Create a room
+                {#if mode === "create-room"}{spaceId
+                        ? "Create room in space"
+                        : "Create a room"}
+                {:else if mode === "create-space"}Create a space
                 {:else if mode === "create-dm"}New direct message
                 {:else}Join a room
                 {/if}
             </h2>
 
-            {#if mode === "create-room"}
+            {#if mode === "create-room" || mode === "create-space"}
                 <div class="flex flex-col gap-3">
                     <div>
                         <!-- svelte-ignore a11y_label_has_associated_control -->
                         <label
                             class="block text-xs font-semibold text-discord-textMuted uppercase tracking-wide mb-1.5"
-                            >Room name</label
                         >
+                            {mode === "create-space"
+                                ? "Space name"
+                                : "Room name"}
+                        </label>
                         <input
                             bind:value={input1}
-                            placeholder="my-room"
+                            placeholder={mode === "create-space"
+                                ? "My Space"
+                                : "my-room"}
                             class="w-full px-3 py-2 bg-discord-backgroundSecondary text-discord-textPrimary placeholder-discord-textMuted rounded border border-discord-divider focus:border-discord-accent focus:outline-none text-sm"
                         />
                     </div>
@@ -156,13 +205,16 @@
                         <!-- svelte-ignore a11y_label_has_associated_control -->
                         <label
                             class="block text-xs font-semibold text-discord-textMuted uppercase tracking-wide mb-1.5"
-                            >Topic <span class="normal-case font-normal"
-                                >(optional)</span
-                            ></label
                         >
+                            Topic <span class="normal-case font-normal"
+                                >(optional)</span
+                            >
+                        </label>
                         <input
                             bind:value={input2}
-                            placeholder="What's this room about?"
+                            placeholder={mode === "create-space"
+                                ? "What's this space about?"
+                                : "What's this room about?"}
                             class="w-full px-3 py-2 bg-discord-backgroundSecondary text-discord-textPrimary placeholder-discord-textMuted rounded border border-discord-divider focus:border-discord-accent focus:outline-none text-sm"
                         />
                     </div>
@@ -217,6 +269,7 @@
                         ></div>
                     {/if}
                     {#if mode === "create-room"}Create
+                    {:else if mode === "create-space"}Create
                     {:else if mode === "create-dm"}Open DM
                     {:else}Join
                     {/if}
