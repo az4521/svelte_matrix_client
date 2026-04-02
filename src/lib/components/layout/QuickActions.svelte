@@ -13,8 +13,10 @@
     interface Props {
         /** If set, new rooms are created inside this space */
         spaceId?: string;
+        /** Called after an action button is clicked (e.g. to close a dropdown) */
+        onaction?: () => void;
     }
-    let { spaceId }: Props = $props();
+    let { spaceId, onaction }: Props = $props();
 
     let mode = $state<Mode | null>(null);
     let input1 = $state(""); // room name / space name / user id / room address
@@ -23,6 +25,7 @@
     let error = $state("");
 
     function open(m: Mode) {
+        onaction?.();
         mode = m;
         input1 = "";
         input2 = "";

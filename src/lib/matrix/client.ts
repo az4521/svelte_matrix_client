@@ -1229,6 +1229,7 @@ export interface SpaceChildInfo {
     numMembers: number;
     isJoined: boolean;
     via: string[];
+    isSpace?: boolean;
 }
 
 export async function fetchSpaceHierarchy(
@@ -1284,7 +1285,6 @@ export async function fetchSpaceHierarchy(
 
         return result.rooms
             .filter((r) => r["room_id"] !== spaceId)
-            .filter((r) => r["room_type"] !== "m.space")
             .map((r) => {
                 const mxcAvatar = r["avatar_url"] as string | undefined;
                 const roomId = r["room_id"] as string;
@@ -1298,6 +1298,7 @@ export async function fetchSpaceHierarchy(
                     numMembers: (r["num_joined_members"] as number) ?? 0,
                     isJoined: joinedIds.has(roomId),
                     via: viaMap.get(roomId) ?? [],
+                    isSpace: r["room_type"] === "m.space",
                 };
             });
     } catch (err) {

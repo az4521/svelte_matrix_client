@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { Room } from "matrix-js-sdk";
     import Avatar from "$lib/components/ui/Avatar.svelte";
+    import Portal from "$lib/components/ui/Portal.svelte";
     import {
         getRoomAvatar,
         getRoomDisplayName,
@@ -83,8 +84,9 @@
               folderId: string | null;
               x: number;
               y: number;
+              touch: boolean;
           }
-        | { kind: "folder"; folderId: string; x: number; y: number };
+        | { kind: "folder"; folderId: string; x: number; y: number; touch: boolean };
 
     const FOLDER_COLORS = [
         "#7289da",
@@ -441,6 +443,7 @@
             folderId,
             x: e.clientX,
             y: e.clientY,
+            touch: !(e instanceof MouseEvent),
         };
     }
 
@@ -449,7 +452,7 @@
         folderId: string,
     ) {
         if (e instanceof MouseEvent) e.preventDefault();
-        contextMenu = { kind: "folder", folderId, x: e.clientX, y: e.clientY };
+        contextMenu = { kind: "folder", folderId, x: e.clientX, y: e.clientY, touch: !(e instanceof MouseEvent) };
     }
 
     // --- Actions ---
@@ -598,6 +601,28 @@
         layout.order.splice(folderIndex, 0, ...spaceIds);
         delete layout.folders[folderId];
         saveLayout(layout);
+    }
+
+    function positionMenu(node: HTMLElement, pos: { x: number; y: number }) {
+        node.style.visibility = "hidden";
+        node.style.left = "0px";
+        node.style.top = "0px";
+        requestAnimationFrame(() => {
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+            const w = node.offsetWidth;
+            const h = node.offsetHeight;
+            let left = Math.min(pos.x, vw - w - 4);
+            if (left < 4) left = 4;
+            let top = pos.y;
+            if (top + h > vh - 4) top = pos.y - h;
+            if (top < 4) top = 4;
+            const maxH = vh - top - 4;
+            if (h > maxH) node.style.maxHeight = maxH + "px";
+            node.style.left = left + "px";
+            node.style.top = top + "px";
+            node.style.visibility = "";
+        });
     }
 
     function toggleFolder(folderId: string) {
@@ -1027,92 +1052,6 @@
         <div class="w-8 h-px bg-discord-divider my-1 flex-shrink-0"></div>
     {/if}
 
-    <!-- Context menu -->
-    {#if contextMenu}
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div
-            class="fixed inset-0 z-50"
-            onclick={() => (contextMenu = null)}
-        ></div>
-        <div
-            class="fixed z-50 bg-discord-backgroundTertiary border border-discord-divider rounded-lg shadow-xl py-1 min-w-40"
-            style="left: {contextMenu.x}px; top: {contextMenu.y}px"
-        >
-            {#if contextMenu.kind === "space"}
-                {@const cm = contextMenu}
-                {@const currentNotif = getRoomNotificationSetting(cm.spaceId)}
-                <p
-                    class="px-3 py-1 text-xs text-discord-textMuted uppercase font-semibold tracking-wide"
-                >
-                    Notifications
-                </p>
-                {#each [["default", "Default"], ["all", "All Messages"], ["mentions", "Mentions Only"], ["mute", "Mute"]] as const as [val, label]}
-                    <button
-                        onclick={() =>
-                            handleSetSpaceNotification(cm.spaceId, val)}
-                        class="w-full text-left px-3 py-1.5 text-sm transition-colors flex items-center gap-2"
-                        class:text-discord-textPrimary={currentNotif === val}
-                        class:text-discord-textSecondary={currentNotif !== val}
-                        class:hover:bg-discord-messageHover={true}
-                    >
-                        <span class="w-3 text-center text-xs"
-                            >{currentNotif === val ? "●" : ""}</span
-                        >
-                        {label}
-                    </button>
-                {/each}
-                {#if canAddRoomToSpace(cm.spaceId)}
-                    <div class="w-full h-px bg-discord-divider my-1"></div>
-                    <button
-                        onclick={() => openCreateRoom(cm.spaceId)}
-                        class="w-full text-left px-3 py-1.5 text-sm text-discord-textSecondary hover:bg-discord-messageHover hover:text-discord-textPrimary transition-colors"
-                        >Create Room</button
-                    >
-                    <button
-                        onclick={() => openAddRoom(cm.spaceId)}
-                        class="w-full text-left px-3 py-1.5 text-sm text-discord-textSecondary hover:bg-discord-messageHover hover:text-discord-textPrimary transition-colors"
-                        >Add Existing Room</button
-                    >
-                {/if}
-                <div class="w-full h-px bg-discord-divider my-1"></div>
-                {#if cm.folderId}
-                    <button
-                        onclick={() =>
-                            handleRemoveFromFolder(cm.spaceId, cm.folderId!)}
-                        class="w-full text-left px-3 py-1.5 text-sm text-discord-textSecondary hover:bg-discord-messageHover hover:text-discord-textPrimary transition-colors"
-                        >Remove from folder</button
-                    >
-                    <div class="w-full h-px bg-discord-divider my-1"></div>
-                {:else}
-                    <button
-                        onclick={() => handleNewFolder(cm.spaceId)}
-                        class="w-full text-left px-3 py-1.5 text-sm text-discord-textSecondary hover:bg-discord-messageHover hover:text-discord-textPrimary transition-colors"
-                        >New Folder</button
-                    >
-                    <div class="w-full h-px bg-discord-divider my-1"></div>
-                {/if}
-                <button
-                    onclick={() => handleLeaveSpace(cm.spaceId)}
-                    class="w-full text-left px-3 py-1.5 text-sm text-discord-danger hover:bg-discord-danger hover:text-white transition-colors"
-                    >Leave Space</button
-                >
-            {:else if contextMenu.kind === "folder"}
-                {@const cm = contextMenu}
-                <button
-                    onclick={() => openColorPicker(cm.folderId)}
-                    class="w-full text-left px-3 py-1.5 text-sm text-discord-textSecondary hover:bg-discord-messageHover hover:text-discord-textPrimary transition-colors"
-                    >Set Color</button
-                >
-                <div class="w-full h-px bg-discord-divider my-1"></div>
-                <button
-                    onclick={() => handleDissolveFolder(cm.folderId)}
-                    class="w-full text-left px-3 py-1.5 text-sm text-discord-danger hover:bg-discord-danger hover:text-white transition-colors"
-                    >Dissolve Folder</button
-                >
-            {/if}
-        </div>
-    {/if}
 
     <!-- Color picker dialog -->
     {#if colorPicker}
@@ -1414,3 +1353,79 @@
         </svg>
     </button>
 </nav>
+
+<Portal>
+{#if contextMenu}
+    {@const cm = contextMenu}
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="fixed inset-0 z-50 {cm.touch ? 'bg-black/40' : ''}" onclick={() => (contextMenu = null)}></div>
+    {#snippet menuContent()}
+        {#if cm.kind === "space"}
+            {@const currentNotif = getRoomNotificationSetting(cm.spaceId)}
+            <p class="px-3 py-1 text-xs text-discord-textMuted uppercase font-semibold tracking-wide">Notifications</p>
+            {#each [["default", "Default"], ["all", "All Messages"], ["mentions", "Mentions Only"], ["mute", "Mute"]] as const as [val, label]}
+                <button
+                    onclick={() => handleSetSpaceNotification(cm.spaceId, val as RoomNotificationSetting)}
+                    class="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-discord-textPrimary hover:bg-discord-accent hover:text-white text-left"
+                >
+                    <span class="w-3 text-center text-xs">{currentNotif === val ? "●" : ""}</span>
+                    {label}
+                </button>
+            {/each}
+            {#if canAddRoomToSpace(cm.spaceId)}
+                <div class="w-full h-px bg-discord-divider my-1"></div>
+                <button
+                    onclick={() => openCreateRoom(cm.spaceId)}
+                    class="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-discord-textPrimary hover:bg-discord-accent hover:text-white text-left"
+                >Create Room</button>
+                <button
+                    onclick={() => openAddRoom(cm.spaceId)}
+                    class="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-discord-textPrimary hover:bg-discord-accent hover:text-white text-left"
+                >Add Existing Room</button>
+            {/if}
+            <div class="w-full h-px bg-discord-divider my-1"></div>
+            {#if cm.folderId}
+                <button
+                    onclick={() => handleRemoveFromFolder(cm.spaceId, cm.folderId!)}
+                    class="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-discord-textPrimary hover:bg-discord-accent hover:text-white text-left"
+                >Remove from folder</button>
+                <div class="w-full h-px bg-discord-divider my-1"></div>
+            {:else}
+                <button
+                    onclick={() => handleNewFolder(cm.spaceId)}
+                    class="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-discord-textPrimary hover:bg-discord-accent hover:text-white text-left"
+                >New Folder</button>
+                <div class="w-full h-px bg-discord-divider my-1"></div>
+            {/if}
+            <button
+                onclick={() => handleLeaveSpace(cm.spaceId)}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-red-400 hover:bg-red-500 hover:text-white text-left"
+            >Leave Space</button>
+        {:else if cm.kind === "folder"}
+            <button
+                onclick={() => openColorPicker(cm.folderId)}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-discord-textPrimary hover:bg-discord-accent hover:text-white text-left"
+            >Set Color</button>
+            <div class="w-full h-px bg-discord-divider my-1"></div>
+            <button
+                onclick={() => handleDissolveFolder(cm.folderId)}
+                class="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-red-400 hover:bg-red-500 hover:text-white text-left"
+            >Dissolve Folder</button>
+        {/if}
+    {/snippet}
+    {#if cm.touch}
+        <div class="fixed bottom-0 left-0 right-0 z-50 bg-discord-backgroundTertiary border-t border-discord-divider rounded-t-2xl shadow-2xl pb-safe pt-2 max-h-[70vh] overflow-y-auto">
+            <div class="w-10 h-1 bg-discord-divider rounded-full mx-auto mb-2"></div>
+            {@render menuContent()}
+        </div>
+    {:else}
+        <div
+            use:positionMenu={{ x: cm.x, y: cm.y }}
+            class="fixed z-50 bg-discord-backgroundTertiary border border-discord-divider rounded-lg shadow-xl py-1 min-w-40 overflow-y-auto"
+        >
+            {@render menuContent()}
+        </div>
+    {/if}
+{/if}
+</Portal>

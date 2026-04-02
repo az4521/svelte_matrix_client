@@ -34,6 +34,10 @@
     },
     "type": "module",
     "dependencies": {
+        "@capacitor/android": "^8.3.0",
+        "@capacitor/cli": "^8.3.0",
+        "@capacitor/core": "^8.3.0",
+        "@capacitor/push-notifications": "^8.0.3",
         "@ruffle-rs/ruffle": "^0.2.0-nightly.2026.3.26",
         "@twemoji/api": "^17.0.2",
         "date-fns": "^4.1.0",

@@ -35,9 +35,11 @@
         getOwnUserId,
     } from "$lib/matrix/client";
     import type { Room } from "matrix-js-sdk";
+    import { initPush, unregisterPush } from "$lib/push";
 
     let showSettings = $state(false);
     let spaceSettingsRoom = $state<Room | null>(null);
+    let roomSettingsRoom = $state<Room | null>(null);
 
     // Animated drawer drag (mobile)
     const DRAWER_WIDTH = 312; // 72px SpaceSidebar + 240px RoomList
@@ -205,6 +207,8 @@
         }
 
         refreshRooms();
+        const client = getClient();
+        if (client) initPush(client).catch(console.error);
 
         const mq = window.matchMedia("(max-width: 767px)");
         const pq = window.matchMedia("(pointer: coarse)");
@@ -278,6 +282,8 @@
     });
 
     async function handleLogout() {
+        const client = getClient();
+        if (client) await unregisterPush(client).catch(() => {});
         try {
             await logout();
         } finally {
@@ -343,6 +349,7 @@
             <RoomList
                 onLogout={handleLogout}
                 onOpenSpaceSettings={(r) => (spaceSettingsRoom = r)}
+                onOpenRoomSettings={(r) => (roomSettingsRoom = r)}
             />
         {:else}
             <!-- Mobile: animated drawer + backdrop -->
@@ -380,6 +387,7 @@
                 <RoomList
                     onLogout={handleLogout}
                     onOpenSpaceSettings={(r) => (spaceSettingsRoom = r)}
+                    onOpenRoomSettings={(r) => (roomSettingsRoom = r)}
                 />
             </div>
         {/if}
@@ -447,5 +455,12 @@
                     roomsState.activeSpaceId,
                 );
         }}
+    />
+{/if}
+
+{#if roomSettingsRoom}
+    <RoomSettings
+        room={roomSettingsRoom}
+        onClose={() => (roomSettingsRoom = null)}
     />
 {/if}
