@@ -173,8 +173,6 @@
         }
     }
 
-
-
     // Hide member list when switching to mobile (isMobile is set async in onMount)
     $effect(() => {
         if (isMobile) showMemberList = false;

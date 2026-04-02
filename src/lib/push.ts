@@ -9,14 +9,12 @@
  */
 
 import { Capacitor } from "@capacitor/core";
-import {
-    PushNotifications,
-    type Token,
-} from "@capacitor/push-notifications";
+import { PushNotifications, type Token } from "@capacitor/push-notifications";
 
 // URL of your push gateway (see push-gateway/ directory).
 // Change this to wherever you deploy the gateway.
-const PUSH_GATEWAY_URL = "https://your-gateway.example.com/_matrix/push/v1/notify";
+const PUSH_GATEWAY_URL =
+    "https://your-gateway.example.com/_matrix/push/v1/notify";
 
 // Must match the app_id registered in your push gateway config.
 const APP_ID = "moe.crafty.matrix";
@@ -54,20 +52,26 @@ export async function initPush(
 
     // Foreground notifications: the OS won't show them automatically, so we
     // could show an in-app toast here if desired. For now just log.
-    PushNotifications.addListener("pushNotificationReceived", (notification) => {
-        console.log("[push] Foreground notification:", notification);
-    });
+    PushNotifications.addListener(
+        "pushNotificationReceived",
+        (notification) => {
+            console.log("[push] Foreground notification:", notification);
+        },
+    );
 
     // User tapped a notification
-    PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
-        const roomId = action.notification.data?.room_id;
-        if (roomId) {
-            // Navigate to the room — import setActiveRoom lazily to avoid circular deps
-            import("$lib/stores/rooms.svelte").then(({ setActiveRoom }) => {
-                setActiveRoom(roomId);
-            });
-        }
-    });
+    PushNotifications.addListener(
+        "pushNotificationActionPerformed",
+        (action) => {
+            const roomId = action.notification.data?.room_id;
+            if (roomId) {
+                // Navigate to the room — import setActiveRoom lazily to avoid circular deps
+                import("$lib/stores/rooms.svelte").then(({ setActiveRoom }) => {
+                    setActiveRoom(roomId);
+                });
+            }
+        },
+    );
 }
 
 async function registerPusher(
@@ -116,7 +120,9 @@ export async function unregisterPush(
             lang: "en",
             data: {},
         });
-    } catch { /* ignore */ }
+    } catch {
+        /* ignore */
+    }
 
     pushInitialised = false;
     await PushNotifications.removeAllListeners();

@@ -46,9 +46,12 @@
     let inviteActionIds = $state(new Set<string>());
 
     // Context menu state
-    let contextMenu = $state<{ roomId: string; x: number; y: number; touch: boolean } | null>(
-        null,
-    );
+    let contextMenu = $state<{
+        roomId: string;
+        x: number;
+        y: number;
+        touch: boolean;
+    } | null>(null);
 
     function positionMenu(node: HTMLElement, pos: { x: number; y: number }) {
         node.style.visibility = "hidden";
@@ -88,7 +91,12 @@
         ctxTouchTimer = setTimeout(() => {
             ctxTouchTimer = null;
             navigator.vibrate?.(50);
-            contextMenu = { roomId, x: ctxTouchStartX, y: ctxTouchStartY, touch: true };
+            contextMenu = {
+                roomId,
+                x: ctxTouchStartX,
+                y: ctxTouchStartY,
+                touch: true,
+            };
         }, 500);
     }
 
@@ -265,24 +273,42 @@
                 title="Actions"
             >
                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
                 </svg>
             </button>
             {#if headerDropdownOpen}
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
                 <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <div class="fixed inset-0 z-40" onclick={() => (headerDropdownOpen = false)}></div>
-                <div class="absolute right-0 top-full mt-1 z-50 bg-discord-backgroundTertiary border border-discord-divider rounded-lg shadow-xl py-1 min-w-44">
-                    <QuickActions spaceId={roomsState.activeSpaceId ?? undefined} onaction={() => (headerDropdownOpen = false)} />
+                <div
+                    class="fixed inset-0 z-40"
+                    onclick={() => (headerDropdownOpen = false)}
+                ></div>
+                <div
+                    class="absolute right-0 top-full mt-1 z-50 bg-discord-backgroundTertiary border border-discord-divider rounded-lg shadow-xl py-1 min-w-44"
+                >
+                    <QuickActions
+                        spaceId={roomsState.activeSpaceId ?? undefined}
+                        onaction={() => (headerDropdownOpen = false)}
+                    />
                     {#if canAccessSpaceSettings}
                         <div class="w-full h-px bg-discord-divider my-1"></div>
                         <button
-                            onclick={() => { headerDropdownOpen = false; activeSpaceRoom && onOpenSpaceSettings?.(activeSpaceRoom); }}
+                            onclick={() => {
+                                headerDropdownOpen = false;
+                                activeSpaceRoom &&
+                                    onOpenSpaceSettings?.(activeSpaceRoom);
+                            }}
                             class="w-full flex items-center gap-2 pr-2 py-1.5 text-left text-sm text-discord-textMuted hover:text-discord-textPrimary hover:bg-discord-messageHover transition-colors"
                             style="padding-left: 0.5rem;"
                         >
-                            <svg class="w-4 h-4 flex-shrink-0 opacity-70" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.01 7.01 0 0 0-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.47.47 0 0 0 .12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.37 1.04.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.47.47 0 0 0-.12-.61l-2.01-1.58zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z"/>
+                            <svg
+                                class="w-4 h-4 flex-shrink-0 opacity-70"
+                                fill="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.01 7.01 0 0 0-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.47.47 0 0 0 .12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.37 1.04.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.47.47 0 0 0-.12-.61l-2.01-1.58zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z"
+                                />
                             </svg>
                             <span class="flex-1 truncate">Space Settings</span>
                         </button>
@@ -355,33 +381,58 @@
                             onclick={() => setActiveRoom(room.roomId)}
                             class="flex-1 flex items-center py-1.5 min-w-0 text-left transition-colors"
                             class:text-discord-textPrimary={isActive || unread}
-                            class:text-discord-textSecondary={!isActive && !unread}
+                            class:text-discord-textSecondary={!isActive &&
+                                !unread}
                             class:hover:text-discord-textPrimary={!isActive}
                             class:font-semibold={unread}
-                            style={isActive ? "padding-left: calc(0.5rem - 3px);" : "padding-left: 0.5rem;"}
+                            style={isActive
+                                ? "padding-left: calc(0.5rem - 3px);"
+                                : "padding-left: 0.5rem;"}
                         >
-                            <div class="w-4 flex-shrink-0 flex items-center justify-center mr-1.5">
+                            <div
+                                class="w-4 flex-shrink-0 flex items-center justify-center mr-1.5"
+                            >
                                 {#if unread && !isActive}
-                                    <span class="w-2 h-2 rounded-full {highlight ? 'bg-discord-danger' : 'bg-white'} flex-shrink-0"></span>
+                                    <span
+                                        class="w-2 h-2 rounded-full {highlight
+                                            ? 'bg-discord-danger'
+                                            : 'bg-white'} flex-shrink-0"
+                                    ></span>
                                 {:else}
-                                    <span class="w-5 h-5 opacity-70 font-semibold flex items-center justify-center text-[0.8rem]">#</span>
+                                    <span
+                                        class="w-5 h-5 opacity-70 font-semibold flex items-center justify-center text-[0.8rem]"
+                                        >#</span
+                                    >
                                 {/if}
                             </div>
-                            <span class="flex-1 text-sm truncate">{getRoomDisplayName(room)}</span>
+                            <span class="flex-1 text-sm truncate"
+                                >{getRoomDisplayName(room)}</span
+                            >
                             {#if highlight && !isActive}
-                                <span class="flex-shrink-0 bg-discord-danger text-white text-xs font-bold rounded-full px-1.5 min-w-[1.2rem] text-center ml-1">
+                                <span
+                                    class="flex-shrink-0 bg-discord-danger text-white text-xs font-bold rounded-full px-1.5 min-w-[1.2rem] text-center ml-1"
+                                >
                                     {highlight > 99 ? "99+" : highlight}
                                 </span>
                             {/if}
                         </button>
                         <!-- svelte-ignore a11y_consider_explicit_label -->
                         <button
-                            onclick={(e) => { e.stopPropagation(); onOpenRoomSettings?.(room); }}
+                            onclick={(e) => {
+                                e.stopPropagation();
+                                onOpenRoomSettings?.(room);
+                            }}
                             class="flex-shrink-0 p-1 mr-1 rounded text-discord-textMuted hover:text-discord-textPrimary transition-colors opacity-0 group-hover/room:opacity-100"
                             title="Room settings"
                         >
-                            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.01 7.01 0 0 0-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.47.47 0 0 0 .12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.37 1.04.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.47.47 0 0 0-.12-.61l-2.01-1.58zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z"/>
+                            <svg
+                                class="w-3.5 h-3.5"
+                                fill="currentColor"
+                                viewBox="0 0 24 24"
+                            >
+                                <path
+                                    d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.01 7.01 0 0 0-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.47.47 0 0 0 .12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.37 1.04.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.47.47 0 0 0-.12-.61l-2.01-1.58zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z"
+                                />
                             </svg>
                         </button>
                     </div>
@@ -402,17 +453,37 @@
                         onclick={() => setActiveSpace(space.roomId)}
                         class="w-full flex items-center gap-2 px-2 py-1.5 rounded text-left hover:bg-discord-messageHover transition-colors group"
                     >
-                        <svg class="w-5 h-5 flex-shrink-0 text-discord-textSecondary opacity-50" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/>
+                        <svg
+                            class="w-5 h-5 flex-shrink-0 text-discord-textSecondary opacity-50"
+                            fill="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"
+                            />
                         </svg>
                         <div class="flex-1 min-w-0">
-                            <p class="text-sm text-discord-textSecondary group-hover:text-discord-textPrimary truncate transition-colors">{space.name}</p>
+                            <p
+                                class="text-sm text-discord-textSecondary group-hover:text-discord-textPrimary truncate transition-colors"
+                            >
+                                {space.name}
+                            </p>
                             {#if space.numMembers > 0}
-                                <p class="text-xs text-discord-textMuted opacity-70">{space.numMembers} members</p>
+                                <p
+                                    class="text-xs text-discord-textMuted opacity-70"
+                                >
+                                    {space.numMembers} members
+                                </p>
                             {/if}
                         </div>
-                        <svg class="w-3.5 h-3.5 flex-shrink-0 text-discord-textMuted opacity-0 group-hover:opacity-100 transition-opacity" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+                        <svg
+                            class="w-3.5 h-3.5 flex-shrink-0 text-discord-textMuted opacity-0 group-hover:opacity-100 transition-opacity"
+                            fill="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"
+                            />
                         </svg>
                     </button>
                 {/each}
@@ -568,60 +639,79 @@
 </div>
 
 <Portal>
-{#if contextMenu}
-    {@const cm = contextMenu}
-    {@const currentSetting = getRoomNotificationSetting(cm.roomId)}
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div
-        class="fixed inset-0 z-50 {cm.touch ? 'bg-black/40' : ''}"
-        onclick={() => (contextMenu = null)}
-    ></div>
-
-    {#snippet menuItems()}
-        <p class="px-3 py-1 text-xs text-discord-textMuted uppercase font-semibold tracking-wide">Notifications</p>
-        {#each [["default", "Default"], ["all", "All Messages"], ["mentions", "Mentions Only"], ["mute", "Mute"]] as const as [val, label]}
-            <button
-                onclick={() => handleSetNotification(cm.roomId, val)}
-                class="w-full text-left px-3 py-1.5 text-sm transition-colors flex items-center gap-2"
-                class:text-discord-textPrimary={currentSetting === val}
-                class:text-discord-textSecondary={currentSetting !== val}
-                class:hover:bg-discord-messageHover={true}
-            >
-                <span class="w-3 text-center text-xs">{currentSetting === val ? "●" : ""}</span>
-                {label}
-            </button>
-        {/each}
-        {#if getSpaces().filter((s) => canAddRoomToSpace(s.roomId)).length > 0}
-            {@const eligibleSpaces = getSpaces().filter((s) => canAddRoomToSpace(s.roomId))}
-            <div class="w-full h-px bg-discord-divider my-1"></div>
-            <p class="px-3 py-1 text-xs text-discord-textMuted uppercase font-semibold tracking-wide">Add to Space</p>
-            {#each eligibleSpaces as space}
-                <button
-                    onclick={() => handleAddToSpace(cm.roomId, space.roomId)}
-                    class="w-full text-left px-3 py-1.5 text-sm text-discord-textSecondary hover:bg-discord-messageHover hover:text-discord-textPrimary transition-colors truncate"
-                >{getSpaceName(space)}</button>
-            {/each}
-        {/if}
-        <div class="w-full h-px bg-discord-divider my-1"></div>
-        <button
-            onclick={() => handleLeave(cm.roomId)}
-            class="w-full text-left px-3 py-1.5 text-sm text-discord-danger hover:bg-discord-danger hover:text-white transition-colors"
-        >Leave Room</button>
-    {/snippet}
-
-    {#if cm.touch}
-        <div class="fixed bottom-0 left-0 right-0 z-50 bg-discord-backgroundTertiary border-t border-discord-divider rounded-t-2xl shadow-2xl pb-safe pt-2 max-h-[70vh] overflow-y-auto">
-            <div class="w-10 h-1 bg-discord-divider rounded-full mx-auto mb-2"></div>
-            {@render menuItems()}
-        </div>
-    {:else}
+    {#if contextMenu}
+        {@const cm = contextMenu}
+        {@const currentSetting = getRoomNotificationSetting(cm.roomId)}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
-            use:positionMenu={{ x: cm.x, y: cm.y }}
-            class="fixed z-50 bg-discord-backgroundTertiary border border-discord-divider rounded-lg shadow-xl py-1 min-w-44 max-w-52 overflow-y-auto"
-        >
-            {@render menuItems()}
-        </div>
+            class="fixed inset-0 z-50 {cm.touch ? 'bg-black/40' : ''}"
+            onclick={() => (contextMenu = null)}
+        ></div>
+
+        {#snippet menuItems()}
+            <p
+                class="px-3 py-1 text-xs text-discord-textMuted uppercase font-semibold tracking-wide"
+            >
+                Notifications
+            </p>
+            {#each [["default", "Default"], ["all", "All Messages"], ["mentions", "Mentions Only"], ["mute", "Mute"]] as const as [val, label]}
+                <button
+                    onclick={() => handleSetNotification(cm.roomId, val)}
+                    class="w-full text-left px-3 py-1.5 text-sm transition-colors flex items-center gap-2"
+                    class:text-discord-textPrimary={currentSetting === val}
+                    class:text-discord-textSecondary={currentSetting !== val}
+                    class:hover:bg-discord-messageHover={true}
+                >
+                    <span class="w-3 text-center text-xs"
+                        >{currentSetting === val ? "●" : ""}</span
+                    >
+                    {label}
+                </button>
+            {/each}
+            {#if getSpaces().filter( (s) => canAddRoomToSpace(s.roomId), ).length > 0}
+                {@const eligibleSpaces = getSpaces().filter((s) =>
+                    canAddRoomToSpace(s.roomId),
+                )}
+                <div class="w-full h-px bg-discord-divider my-1"></div>
+                <p
+                    class="px-3 py-1 text-xs text-discord-textMuted uppercase font-semibold tracking-wide"
+                >
+                    Add to Space
+                </p>
+                {#each eligibleSpaces as space}
+                    <button
+                        onclick={() =>
+                            handleAddToSpace(cm.roomId, space.roomId)}
+                        class="w-full text-left px-3 py-1.5 text-sm text-discord-textSecondary hover:bg-discord-messageHover hover:text-discord-textPrimary transition-colors truncate"
+                        >{getSpaceName(space)}</button
+                    >
+                {/each}
+            {/if}
+            <div class="w-full h-px bg-discord-divider my-1"></div>
+            <button
+                onclick={() => handleLeave(cm.roomId)}
+                class="w-full text-left px-3 py-1.5 text-sm text-discord-danger hover:bg-discord-danger hover:text-white transition-colors"
+                >Leave Room</button
+            >
+        {/snippet}
+
+        {#if cm.touch}
+            <div
+                class="fixed bottom-0 left-0 right-0 z-50 bg-discord-backgroundTertiary border-t border-discord-divider rounded-t-2xl shadow-2xl pb-safe pt-2 max-h-[70vh] overflow-y-auto"
+            >
+                <div
+                    class="w-10 h-1 bg-discord-divider rounded-full mx-auto mb-2"
+                ></div>
+                {@render menuItems()}
+            </div>
+        {:else}
+            <div
+                use:positionMenu={{ x: cm.x, y: cm.y }}
+                class="fixed z-50 bg-discord-backgroundTertiary border border-discord-divider rounded-lg shadow-xl py-1 min-w-44 max-w-52 overflow-y-auto"
+            >
+                {@render menuItems()}
+            </div>
+        {/if}
     {/if}
-{/if}
 </Portal>

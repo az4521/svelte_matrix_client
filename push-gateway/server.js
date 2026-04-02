@@ -25,7 +25,8 @@ import { readFileSync } from "fs";
 
 // --- Config ---
 const PORT = process.env.PORT || 3000;
-const SERVICE_ACCOUNT_PATH = process.env.GOOGLE_APPLICATION_CREDENTIALS || "./service-account.json";
+const SERVICE_ACCOUNT_PATH =
+    process.env.GOOGLE_APPLICATION_CREDENTIALS || "./service-account.json";
 const APP_ID = "moe.crafty.matrix";
 
 // --- Firebase init ---
@@ -34,7 +35,9 @@ try {
     serviceAccount = JSON.parse(readFileSync(SERVICE_ACCOUNT_PATH, "utf8"));
 } catch {
     console.error(`[gateway] ERROR: Could not read ${SERVICE_ACCOUNT_PATH}`);
-    console.error("[gateway] Download your Firebase service account JSON and save it as service-account.json");
+    console.error(
+        "[gateway] Download your Firebase service account JSON and save it as service-account.json",
+    );
     process.exit(1);
 }
 
@@ -90,17 +93,27 @@ app.post("/_matrix/push/v1/notify", async (req, res) => {
                     priority: "high",
                     // For background wake-up without showing a notification
                     // (the Capacitor plugin will show one if the app is in background)
-                    notification: unread > 0 ? {
-                        title: "New message",
-                        body: room_id ? `In ${room_id}` : "You have a new message",
-                        sound: "default",
-                        channelId: "matrix_messages",
-                    } : undefined,
+                    notification:
+                        unread > 0
+                            ? {
+                                  title: "New message",
+                                  body: room_id
+                                      ? `In ${room_id}`
+                                      : "You have a new message",
+                                  sound: "default",
+                                  channelId: "matrix_messages",
+                              }
+                            : undefined,
                 },
             });
-            console.log(`[gateway] Sent to ${fcmToken.slice(0, 16)}… room=${room_id}`);
+            console.log(
+                `[gateway] Sent to ${fcmToken.slice(0, 16)}… room=${room_id}`,
+            );
         } catch (err) {
-            console.error(`[gateway] FCM error for token ${fcmToken.slice(0, 16)}…:`, err?.errorInfo?.code ?? err);
+            console.error(
+                `[gateway] FCM error for token ${fcmToken.slice(0, 16)}…:`,
+                err?.errorInfo?.code ?? err,
+            );
             // FCM errors that mean the token is permanently invalid
             const invalidCodes = [
                 "messaging/invalid-registration-token",

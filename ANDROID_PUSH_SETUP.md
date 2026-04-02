@@ -18,6 +18,7 @@ npm install
 ```
 
 From the Firebase console:
+
 - Project Settings → Service Accounts → Generate new private key
 - Save the downloaded JSON as `push-gateway/service-account.json`
 
@@ -32,7 +33,8 @@ PORT=3000 node server.js
 Edit `src/lib/push.ts` and set `PUSH_GATEWAY_URL` to your gateway's public URL:
 
 ```ts
-const PUSH_GATEWAY_URL = "https://your-gateway.example.com/_matrix/push/v1/notify";
+const PUSH_GATEWAY_URL =
+    "https://your-gateway.example.com/_matrix/push/v1/notify";
 ```
 
 ## 4. Build and Sync
