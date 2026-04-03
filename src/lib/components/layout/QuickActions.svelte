@@ -7,6 +7,7 @@
         canAddRoomToSpace,
     } from "$lib/matrix/client";
     import { setActiveRoom } from "$lib/stores/rooms.svelte";
+    import Portal from "$lib/components/ui/Portal.svelte";
 
     type Mode = "create-room" | "create-space" | "create-dm" | "join-room";
 
@@ -162,6 +163,7 @@
 </div>
 
 <!-- Modal -->
+<Portal>
 {#if mode !== null}
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -281,3 +283,4 @@
         </div>
     </div>
 {/if}
+</Portal>
